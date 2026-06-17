@@ -8,7 +8,6 @@
 [![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/CSS)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-7ee787.svg?style=for-the-badge)](./CONTRIBUTING.md)
-[![Stars](https://img.shields.io/github/stars/shivam/cyber-assassins?style=for-the-badge&color=bc8cff)](https://github.com/shivam/cyber-assassins/stargazers)
 
 <br/>
 
@@ -471,6 +470,5 @@ See [LICENSE](./LICENSE) for full text.
 *If this helped you learn Linux, please give it a ⭐ — it helps others find it too!*
 
 [![GitHub stars](https://img.shields.io/github/stars/shivam-pro-hacker/linux_simulation?style=social)](https://github.com/Shivam-pro-hacker/linux_simulation)
-[![GitHub forks](https://img.shields.io/github/forks/shivam-pro-hacker/linux_simulation?style=social)](https://github.com/Shivam-pro-hacker/linux_simulation/fork)
 
 </div>
