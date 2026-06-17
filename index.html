@@ -1,0 +1,2798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Assassins — Linux Terminal Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── CSS Variables / Theme ─── */
+    :root {
+      --bg:          #0d1117;
+      --bg2:         #161b22;
+      --bg3:         #21262d;
+      --border:      #30363d;
+      --prompt:      #7ee787;
+      --cmd:         #e6edf3;
+      --output:      #b3c3d4;
+      --error:       #f85149;
+      --warn:        #e3b341;
+      --info:        #58a6ff;
+      --accent:      #bc8cff;
+      --root-prompt: #f85149;
+      --dim:         #484f58;
+      --cursor:      #7ee787;
+      --selection:   #264f78;
+      --scrollbar:   #30363d;
+      --font-mono:   'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+      --font-ui:     'Inter', system-ui, sans-serif;
+      --title-glow:  #bc8cff;
+    }
+
+    /* ─── Reset ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--cmd);
+      font-family: var(--font-mono);
+      overflow: hidden;
+    }
+
+    /* ─── Layout ─── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ─── Header / Title Bar ─── */
+    .header {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(188,140,255,0.04), transparent);
+      pointer-events: none;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .title-main {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, #bc8cff, #58a6ff, #7ee787, #bc8cff);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 4s linear infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 300% 50%; }
+    }
+
+    .title-sub {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Theme picker button */
+    .theme-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--output);
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; cursor: pointer; transition: transform 0.15s; }
+    .dot:hover { transform: scale(1.2); }
+    .dot-red   { background: #ff5f57; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #28c840; }
+    .dots { display: flex; gap: 6px; align-items: center; }
+
+    /* ─── Theme Panel ─── */
+    .theme-panel {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: none;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .theme-panel.open { display: flex; }
+    .theme-label {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      min-width: 60px;
+    }
+    .theme-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+    .swatch {
+      width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.15s;
+      position: relative;
+    }
+    .swatch:hover, .swatch.active { border-color: white; transform: scale(1.1); }
+    .swatch[title]::after {
+      content: attr(title);
+      position: absolute; bottom: -22px; left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-ui); font-size: 9px;
+      color: var(--dim); white-space: nowrap; pointer-events: none;
+    }
+
+    .color-row { display: flex; align-items: center; gap: 10px; }
+    .color-input-wrap {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .color-input-wrap label {
+      font-family: var(--font-ui); font-size: 11px; color: var(--dim);
+    }
+    input[type="color"] {
+      width: 28px; height: 28px; border: none; border-radius: 4px;
+      cursor: pointer; background: none; padding: 0;
+    }
+    .font-size-ctrl {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .font-size-ctrl button {
+      background: var(--bg3); border: 1px solid var(--border);
+      color: var(--output); width: 24px; height: 24px;
+      border-radius: 4px; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .font-size-ctrl span {
+      font-family: var(--font-ui); font-size: 12px; color: var(--output); min-width: 30px; text-align: center;
+    }
+
+    /* ─── Tabs ─── */
+    .tabs {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 4px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 7px 16px;
+      font-size: 12px;
+      font-family: var(--font-ui);
+      color: var(--dim);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: all 0.15s;
+      display: flex; align-items: center; gap: 6px;
+      user-select: none;
+    }
+    .tab.active { color: var(--prompt); border-bottom-color: var(--prompt); }
+    .tab:hover:not(.active) { color: var(--output); }
+    .tab-close {
+      opacity: 0; font-size: 14px; line-height: 1;
+      transition: opacity 0.15s; color: var(--dim);
+    }
+    .tab:hover .tab-close { opacity: 1; }
+    .tab-close:hover { color: var(--error) !important; }
+    .new-tab-btn {
+      margin-left: 4px; padding: 4px 8px;
+      background: none; border: none;
+      color: var(--dim); cursor: pointer; font-size: 18px;
+      transition: color 0.15s;
+    }
+    .new-tab-btn:hover { color: var(--prompt); }
+
+    /* ─── Main Content ─── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ─── Sidebar ─── */
+    .sidebar {
+      width: 220px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 0.2s;
+    }
+    .sidebar.collapsed { width: 0; }
+
+    .sidebar-header {
+      padding: 10px 14px;
+      font-family: var(--font-ui);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--dim);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .tree {
+      overflow-y: auto;
+      padding: 8px 0;
+      flex: 1;
+    }
+    .tree::-webkit-scrollbar { width: 4px; }
+    .tree::-webkit-scrollbar-track { background: transparent; }
+    .tree::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 2px; }
+
+    .tree-item {
+      padding: 3px 14px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--output);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.1s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tree-item:hover { background: var(--bg3); }
+    .tree-item.dir { color: var(--info); }
+    .tree-item.exec { color: var(--prompt); }
+    .tree-item .icon { font-size: 11px; flex-shrink: 0; }
+
+    .sidebar-section {
+      border-top: 1px solid var(--border);
+      padding: 8px 0;
+    }
+
+    /* ─── Terminal Pane ─── */
+    .terminal-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .terminal {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.65;
+      scroll-behavior: smooth;
+    }
+    .terminal::-webkit-scrollbar { width: 6px; }
+    .terminal::-webkit-scrollbar-track { background: transparent; }
+    .terminal::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+    .terminal::selection { background: var(--selection); }
+
+    /* ─── Output Lines ─── */
+    .line { display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 0; }
+    .line-output { margin-bottom: 0; }
+
+    .prompt-user  { color: var(--prompt); font-weight: 600; }
+    .prompt-root  { color: var(--root-prompt); font-weight: 600; }
+    .prompt-at    { color: var(--dim); }
+    .prompt-host  { color: var(--info); }
+    .prompt-colon { color: var(--dim); }
+    .prompt-path  { color: var(--accent); font-weight: 500; }
+    .prompt-char  { color: var(--prompt); font-weight: 700; margin-right: 8px; }
+    .prompt-root-char { color: var(--root-prompt); font-weight: 700; margin-right: 8px; }
+    .cmd-text     { color: var(--cmd); }
+
+    .out-normal { color: var(--output); }
+    .out-error  { color: var(--error); }
+    .out-warn   { color: var(--warn); }
+    .out-info   { color: var(--info); }
+    .out-success { color: var(--prompt); }
+    .out-accent { color: var(--accent); }
+    .out-dim    { color: var(--dim); }
+    .out-bold   { font-weight: 700; }
+    .out-dir    { color: var(--info); font-weight: 600; }
+    .out-exec   { color: var(--prompt); font-weight: 600; }
+    .out-link   { color: var(--accent); }
+    .out-white  { color: #ffffff; }
+
+    .output-block {
+      padding: 2px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    pre.output-block { font-family: var(--font-mono); font-size: inherit; }
+
+    .edu-tip {
+      margin: 6px 0 4px;
+      padding: 8px 12px;
+      background: rgba(88,166,255,0.08);
+      border-left: 3px solid var(--info);
+      border-radius: 0 6px 6px 0;
+      font-size: 12px;
+      color: var(--info);
+      font-family: var(--font-ui);
+    }
+    .edu-tip strong { color: #8dbeff; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 8px 0;
+    }
+
+    /* ─── Input Row ─── */
+    .input-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .input-prompt { display: flex; align-items: center; flex-shrink: 0; font-family: var(--font-mono); font-size: 14px; }
+    .input-field {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--cmd);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      caret-color: var(--cursor);
+      line-height: 1.65;
+    }
+    .input-field::selection { background: var(--selection); }
+
+    /* ─── Autocomplete dropdown ─── */
+    .autocomplete {
+      position: absolute;
+      bottom: 60px;
+      left: 20px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      z-index: 100;
+      min-width: 200px;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .autocomplete.visible { display: block; }
+    .ac-item {
+      padding: 6px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--output);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .ac-item:hover, .ac-item.selected { background: var(--bg3); color: var(--prompt); }
+    .ac-item .ac-type { color: var(--dim); font-size: 10px; min-width: 40px; }
+
+    /* ─── Nano Editor ─── */
+    .nano-editor {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      background: var(--bg);
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+    .nano-editor.active { display: flex; }
+    .nano-titlebar {
+      background: var(--bg3);
+      padding: 4px 12px;
+      text-align: center;
+      color: var(--output);
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nano-content {
+      flex: 1;
+      padding: 10px 14px;
+      overflow-y: auto;
+      resize: none;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--cmd);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .nano-statusbar {
+      background: var(--bg3);
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--dim);
+      border-top: 1px solid var(--border);
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .nano-key { color: var(--output); }
+    .nano-key strong { background: var(--bg2); padding: 1px 5px; border-radius: 3px; color: var(--accent); }
+
+    /* ─── Password Prompt ─── */
+    .pwd-prompt {
+      color: var(--warn);
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+
+    /* ─── Status Bar ─── */
+    .statusbar {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 4px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-family: var(--font-ui);
+      font-size: 11px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+    .status-item { display: flex; align-items: center; gap: 5px; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--prompt); }
+    .status-dot.root { background: var(--root-prompt); }
+    .status-spacer { flex: 1; }
+    .status-cmd-count { color: var(--accent); font-weight: 600; }
+
+    /* ─── Footer ─── */
+    .footer {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      border-top: 1px solid var(--border);
+      padding: 8px 20px;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .footer span { color: var(--accent); font-weight: 600; }
+    .footer a { color: var(--info); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* ─── Scrollbar global ─── */
+    * { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+
+    /* ─── Animations ─── */
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+    .blink { animation: blink 1s step-start infinite; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn 0.15s ease-out; }
+
+    /* ─── Boot Screen ─── */
+    .boot-screen {
+      position: fixed; inset: 0; z-index: 999;
+      background: #000;
+      display: flex; flex-direction: column;
+      padding: 20px 30px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #7ee787;
+      overflow: hidden;
+    }
+    .boot-screen.done { display: none; }
+    .boot-line { margin: 1px 0; opacity: 0; }
+    @keyframes bootLine { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ─── Help / Cheatsheet ─── */
+    .cheatsheet {
+      display: none;
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: 320px;
+      background: var(--bg2);
+      border-left: 1px solid var(--border);
+      z-index: 50;
+      flex-direction: column;
+    }
+    .cheatsheet.open { display: flex; }
+    .cs-header {
+      padding: 12px 16px;
+      font-family: var(--font-ui);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--output);
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      letter-spacing: 1px; text-transform: uppercase;
+    }
+    .cs-close { cursor: pointer; color: var(--dim); font-size: 18px; }
+    .cs-close:hover { color: var(--error); }
+    .cs-body { overflow-y: auto; padding: 10px 0; flex: 1; }
+    .cs-category {
+      padding: 8px 16px 4px;
+      font-family: var(--font-ui);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .cs-cmd {
+      display: flex; padding: 4px 16px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .cs-cmd:hover { background: var(--bg3); }
+    .cs-cmd-name {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--prompt); min-width: 100px;
+    }
+    .cs-cmd-desc {
+      font-family: var(--font-ui); font-size: 11px;
+      color: var(--dim); flex: 1;
+    }
+
+    /* Mobile */
+    @media (max-width: 700px) {
+      .sidebar { display: none; }
+      .cheatsheet { width: 100%; }
+      .header-controls .theme-btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Boot Screen -->
+<div class="boot-screen" id="bootScreen"></div>
+
+<!-- App -->
+<div class="app" id="app" style="display:none">
+  <!-- Header -->
+  <header class="header">
+    <div class="title-group">
+      <div class="title-main">⚡ Cyber Assassins</div>
+      <div class="title-sub">Linux Terminal Simulator &nbsp;·&nbsp; Practice Environment</div>
+    </div>
+    <div class="header-controls">
+      <button class="theme-btn" id="themeToggle">🎨 Theme</button>
+      <button class="theme-btn" id="cheatToggle">📋 Commands</button>
+      <button class="theme-btn" id="sidebarToggle">🗂 Files</button>
+      <div class="dots">
+        <div class="dot dot-red"    title="Close"    onclick="alert('This is a simulator — nothing to close!')"></div>
+        <div class="dot dot-yellow" title="Minimize" onclick="alert('This is a simulator!')"></div>
+        <div class="dot dot-green"  title="Maximize"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Theme Panel -->
+  <div class="theme-panel" id="themePanel">
+    <div class="color-row">
+      <span class="theme-label">Preset</span>
+      <div class="theme-swatches" id="presetSwatches">
+        <div class="swatch active" style="background:#0d1117" data-theme="github-dark" title="GitHub Dark"></div>
+        <div class="swatch" style="background:#1a1a2e" data-theme="midnight" title="Midnight"></div>
+        <div class="swatch" style="background:#0f0f0f" data-theme="matrix" title="Matrix"></div>
+        <div class="swatch" style="background:#1e1e1e" data-theme="vscode" title="VS Code"></div>
+        <div class="swatch" style="background:#2b0000" data-theme="kali" title="Kali Red"></div>
+        <div class="swatch" style="background:#001b00" data-theme="hacker" title="Hacker"></div>
+        <div class="swatch" style="background:#1c1038" data-theme="dracula" title="Dracula"></div>
+        <div class="swatch" style="background:#f5f5f0" data-theme="light" title="Light"></div>
+      </div>
+    </div>
+    <div class="color-row">
+      <span class="theme-label">Custom</span>
+      <div class="color-input-wrap">
+        <label>BG</label>
+        <input type="color" id="colorBg" value="#0d1117" oninput="setCustomColor('bg', this.value)" />
+      </div>
+      <div class="color-input-wrap">
+        <label>Prompt</label>
+        <input type="color" id="colorPrompt" value="#7ee787" oninput="setCustomColor('prompt', this.value)" />
+      </div>
+      <div class="color-input-wrap">
+        <label>Text</label>
+        <input type="color" id="colorCmd" value="#e6edf3" oninput="setCustomColor('cmd', this.value)" />
+      </div>
+      <div class="color-input-wrap">
+        <label>Accent</label>
+        <input type="color" id="colorAccent" value="#bc8cff" oninput="setCustomColor('accent', this.value)" />
+      </div>
+      <div class="font-size-ctrl">
+        <span class="theme-label">Font</span>
+        <button onclick="changeFontSize(-1)">−</button>
+        <span id="fontSizeLabel">14px</span>
+        <button onclick="changeFontSize(1)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabBar">
+    <div class="tab active" data-tab="0">
+      <span>student@kali:~</span>
+      <span class="tab-close" onclick="closeTab(event,0)">×</span>
+    </div>
+    <button class="new-tab-btn" onclick="newTab()" title="New terminal">+</button>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span>File Explorer</span>
+      </div>
+      <div class="tree" id="fileTree"></div>
+    </aside>
+
+    <!-- Terminal Wrap -->
+    <div class="terminal-wrap">
+      <!-- Terminal output -->
+      <div class="terminal" id="terminal" onclick="focusInput()"></div>
+
+      <!-- Nano editor -->
+      <div class="nano-editor" id="nanoEditor">
+        <div class="nano-titlebar" id="nanoTitle">GNU nano — untitled</div>
+        <textarea class="nano-content" id="nanoContent" spellcheck="false"></textarea>
+        <div class="nano-statusbar">
+          <span class="nano-key"><strong>^X</strong> Exit</span>
+          <span class="nano-key"><strong>^O</strong> Write Out</span>
+          <span class="nano-key"><strong>^W</strong> Where Is</span>
+          <span class="nano-key"><strong>^K</strong> Cut Text</span>
+          <span class="nano-key"><strong>^U</strong> Paste</span>
+          <span class="nano-key"><strong>^G</strong> Get Help</span>
+        </div>
+      </div>
+
+      <!-- Input Row -->
+      <div class="input-row" id="inputRow">
+        <div class="input-prompt" id="inputPromptDisplay"></div>
+        <input class="input-field" id="inputField"
+          type="text" autocomplete="off" autocorrect="off"
+          autocapitalize="off" spellcheck="false"
+          placeholder=""
+          aria-label="Terminal input" />
+      </div>
+
+      <!-- Autocomplete -->
+      <div class="autocomplete" id="autocomplete"></div>
+
+      <!-- Cheatsheet -->
+      <div class="cheatsheet" id="cheatsheet">
+        <div class="cs-header">
+          Command Reference
+          <span class="cs-close" id="cheatClose">×</span>
+        </div>
+        <div class="cs-body" id="cheatBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <div class="status-item">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusUser">student@kali</span>
+    </div>
+    <div class="status-item">📁 <span id="statusPath">~</span></div>
+    <div class="status-item">💻 Linux Terminal Simulator</div>
+    <div class="status-spacer"></div>
+    <div class="status-item">Commands run: <span class="status-cmd-count" id="cmdCount">0</span></div>
+    <div class="status-item" style="color:var(--dim)">Tab to autocomplete · ↑↓ history · Ctrl+L clear</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Made with ❤️ by <span>Shivam</span> &nbsp;·&nbsp;
+    <a href="https://github.com" target="_blank">GitHub</a> &nbsp;·&nbsp;
+    MIT License &nbsp;·&nbsp; Cyber Assassins © 2026
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CYBER ASSASSINS — Linux Terminal Simulator
+   A complete in-browser Linux practice environment.
+   By Shivam · MIT License
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ── Virtual Filesystem ──────────────────────────────────────────────
+const FS = {
+  '/': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/home': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/home/student': { type: 'dir', perm: 'drwxr-xr-x', owner: 'student', group: 'student', mtime: now() },
+  '/home/student/Desktop': { type: 'dir', perm: 'drwxr-xr-x', owner: 'student', group: 'student', mtime: now() },
+  '/home/student/Documents': { type: 'dir', perm: 'drwxr-xr-x', owner: 'student', group: 'student', mtime: now() },
+  '/home/student/Downloads': { type: 'dir', perm: 'drwxr-xr-x', owner: 'student', group: 'student', mtime: now() },
+  '/home/student/Documents/readme.txt': { type: 'file', perm: '-rw-r--r--', owner: 'student', group: 'student', mtime: now(), content: 'Welcome to Cyber Assassins!\nThis is a Linux terminal simulator.\nPractice commands safely here.\n\nMade by Shivam.' },
+  '/home/student/Documents/notes.txt': { type: 'file', perm: '-rw-r--r--', owner: 'student', group: 'student', mtime: now(), content: 'Linux cheatsheet notes:\n- ls: list files\n- cd: change directory\n- pwd: print working directory\n- cat: show file contents\n- man: manual pages' },
+  '/home/student/.bashrc': { type: 'file', perm: '-rw-r--r--', owner: 'student', group: 'student', mtime: now(), content: '# ~/.bashrc\nexport PATH=$PATH:/usr/local/bin\nalias ll="ls -la"\nalias cls="clear"\nexport EDITOR=nano' },
+  '/home/student/.bash_history': { type: 'file', perm: '-rw-------', owner: 'student', group: 'student', mtime: now(), content: '' },
+  '/etc': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/etc/passwd': { type: 'file', perm: '-rw-r--r--', owner: 'root', group: 'root', mtime: now(), content: 'root:x:0:0:root:/root:/bin/bash\nstudent:x:1000:1000:Cyber Student:/home/student:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin' },
+  '/etc/hostname': { type: 'file', perm: '-rw-r--r--', owner: 'root', group: 'root', mtime: now(), content: 'kali' },
+  '/etc/os-release': { type: 'file', perm: '-rw-r--r--', owner: 'root', group: 'root', mtime: now(), content: 'NAME="Kali GNU/Linux"\nVERSION="2024.1"\nID=kali\nID_LIKE=debian\nPRETTY_NAME="Kali GNU/Linux 2024.1"\nHOME_URL="https://www.kali.org/"' },
+  '/etc/hosts': { type: 'file', perm: '-rw-r--r--', owner: 'root', group: 'root', mtime: now(), content: '127.0.0.1   localhost\n127.0.1.1   kali\n::1         localhost ip6-localhost\n' },
+  '/tmp': { type: 'dir', perm: 'drwxrwxrwt', owner: 'root', group: 'root', mtime: now() },
+  '/var': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/var/log': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/var/log/syslog': { type: 'file', perm: '-rw-r-----', owner: 'root', group: 'adm', mtime: now(), content: 'Jun 16 10:00:01 kali kernel: Booting Linux...\nJun 16 10:00:02 kali systemd: Started Network Service.\nJun 16 10:00:05 kali sshd: Server listening on 0.0.0.0 port 22.' },
+  '/usr': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/usr/bin': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/usr/local': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/bin': { type: 'dir', perm: 'drwxr-xr-x', owner: 'root', group: 'root', mtime: now() },
+  '/root': { type: 'dir', perm: 'drwx------', owner: 'root', group: 'root', mtime: now() },
+  '/root/.bashrc': { type: 'file', perm: '-rw-r--r--', owner: 'root', group: 'root', mtime: now(), content: '# root bashrc\nexport PATH=$PATH:/usr/sbin\nalias ll="ls -la"' },
+};
+
+function now() { return new Date().toLocaleString('en-US', { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+
+// ── State ────────────────────────────────────────────────────────────
+let state = {
+  cwd: '/home/student',
+  user: 'student',
+  hostname: 'kali',
+  isRoot: false,
+  password: 'toor',
+  sudoPassword: 'toor',
+  env: { HOME: '/home/student', USER: 'student', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', SHELL: '/bin/bash', TERM: 'xterm-256color', LANG: 'en_US.UTF-8', EDITOR: 'nano' },
+  aliases: { ll: 'ls -la', la: 'ls -A', l: 'ls -CF', cls: 'clear' },
+  history: [],
+  histIdx: -1,
+  cmdCount: 0,
+  nanoFile: null,
+  awaitingPassword: false,
+  passwordCallback: null,
+  passwordMask: true,
+  tabIdx: 0,
+  tabs: [{ id: 0, title: 'student@kali:~', history: [], output: '' }],
+  fontSize: 14,
+};
+
+// ── Utilities ────────────────────────────────────────────────────────
+function resolvePath(p) {
+  if (!p || p === '~') return '/home/student';
+  if (p.startsWith('~/')) p = '/home/student/' + p.slice(2);
+  if (!p.startsWith('/')) p = state.cwd.replace(/\/$/, '') + '/' + p;
+  const parts = p.split('/').filter(Boolean);
+  const resolved = [];
+  for (const part of parts) {
+    if (part === '..') resolved.pop();
+    else if (part !== '.') resolved.push(part);
+  }
+  return '/' + resolved.join('/');
+}
+
+function listDir(path) {
+  const norm = path.replace(/\/$/, '') || '/';
+  return Object.keys(FS).filter(k => {
+    if (k === norm) return false;
+    const parent = k.replace(/\/[^/]+$/, '') || '/';
+    return parent === norm;
+  }).map(k => ({ path: k, name: k.split('/').pop(), ...FS[k] }));
+}
+
+function displayPath(p) {
+  if (p === '/home/student') return '~';
+  if (p.startsWith('/home/student/')) return '~/' + p.slice('/home/student/'.length);
+  return p;
+}
+
+function formatSize(content) {
+  const bytes = content ? content.length : 0;
+  if (bytes < 1024) return bytes + 'B';
+  return (bytes / 1024).toFixed(1) + 'K';
+}
+
+function permStr(entry) { return entry.perm || '-rw-r--r--'; }
+
+function matchesGlob(name, pattern) {
+  const regex = new RegExp('^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+  return regex.test(name);
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+const terminal = document.getElementById('terminal');
+
+function appendLine(html, cls = '') {
+  const div = document.createElement('div');
+  div.className = 'output-block fade-in' + (cls ? ' ' + cls : '');
+  div.innerHTML = html;
+  terminal.appendChild(div);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function appendRaw(html) { appendLine(html); }
+
+function appendOutput(lines) {
+  if (!lines) return;
+  if (Array.isArray(lines)) lines.forEach(l => appendLine(l));
+  else appendLine(lines);
+}
+
+function cl(text, cls) { return `<span class="${cls}">${escHtml(text)}</span>`; }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function promptHTML() {
+  const user  = cl(state.user, state.isRoot ? 'prompt-root' : 'prompt-user');
+  const at    = cl('@', 'prompt-at');
+  const host  = cl(state.hostname, 'prompt-host');
+  const colon = cl(':', 'prompt-colon');
+  const path  = cl(displayPath(state.cwd), 'prompt-path');
+  const char  = `<span class="${state.isRoot ? 'prompt-root-char' : 'prompt-char'}">${state.isRoot ? '#' : '$'}</span>`;
+  return user + at + host + colon + path + char;
+}
+
+function updatePromptDisplay() {
+  document.getElementById('inputPromptDisplay').innerHTML = promptHTML() + '&nbsp;';
+}
+
+function showCommandLine(cmd) {
+  appendRaw(`<div class="line">${promptHTML()}&nbsp;<span class="cmd-text">${escHtml(cmd)}</span></div>`);
+}
+
+function tip(msg) {
+  appendRaw(`<div class="edu-tip">💡 <strong>Tip:</strong> ${msg}</div>`);
+}
+
+// ── Education Tips ────────────────────────────────────────────────────
+const TIPS = {
+  ls:    'Use <code>ls -la</code> for detailed file listing with permissions, owner, size and timestamps.',
+  cd:    '<code>cd ..</code> goes up one level. <code>cd ~</code> goes to home. <code>cd -</code> goes to previous directory.',
+  pwd:   'PWD = Print Working Directory. It always shows your absolute path from root <code>/</code>.',
+  cat:   'Use <code>cat -n file</code> to show line numbers. For long files, use <code>less</code> instead.',
+  mkdir: 'Use <code>mkdir -p a/b/c</code> to create nested directories in one command.',
+  rm:    'There is no Recycle Bin in Linux! <code>rm</code> permanently deletes files. Use <code>rm -i</code> for confirmation.',
+  cp:    'Use <code>cp -r</code> to copy entire directories recursively.',
+  mv:    '<code>mv</code> also renames files: <code>mv oldname.txt newname.txt</code>',
+  chmod: 'Permissions: <code>chmod 755</code> = owner rwx, group r-x, others r-x. Numeric: r=4, w=2, x=1.',
+  sudo:  '<code>sudo</code> runs a command as root (superuser). Always use with caution!',
+  grep:  'Use <code>grep -r "pattern" .</code> to search recursively in all files.',
+  find:  '<code>find / -name "file.txt"</code> searches from root. Use <code>find . -type f</code> for only files.',
+  echo:  'Use <code>echo "text" > file.txt</code> to write to a file. <code>>></code> appends instead.',
+  tar:   '<code>tar -czf archive.tar.gz folder/</code> creates a compressed archive.',
+  history: 'Press <code>↑</code>/<code>↓</code> to browse command history. Use <code>!n</code> to repeat command n.',
+  nano:  'In nano: Ctrl+O = save, Ctrl+X = exit, Ctrl+W = search, Ctrl+K = cut line.',
+  kill:  'Use <code>kill -9 PID</code> for force kill. Find PIDs with <code>ps aux</code> or <code>top</code>.',
+  ssh:   'SSH = Secure Shell. Default port is 22. Use <code>ssh user@host</code> to connect.',
+  ping:  '<code>ping -c 4 host</code> sends exactly 4 packets. Use Ctrl+C to stop continuous ping.',
+  ifconfig: 'On modern systems, <code>ip addr show</code> is the newer equivalent of <code>ifconfig</code>.',
+  passwd: 'Always use a strong password with letters, numbers, and symbols.',
+  useradd: 'After <code>useradd</code>, set a password with <code>passwd username</code>.',
+  env:   'Environment variables like <code>$HOME</code>, <code>$PATH</code>, <code>$USER</code> store system-wide settings.',
+  wc:    '<code>wc -l file</code> counts lines. <code>wc -w</code> words. <code>wc -c</code> bytes.',
+  head:  '<code>head -n 20 file</code> shows first 20 lines. Default is 10.',
+  tail:  '<code>tail -f logfile</code> follows a log file in real-time — essential for monitoring!',
+  sort:  '<code>sort -r</code> reverses sort. <code>sort -n</code> numeric sort. <code>sort -u</code> removes duplicates.',
+  uniq:  '<code>uniq</code> only removes consecutive duplicates. Always <code>sort | uniq</code> together.',
+  diff:  '<code>diff file1 file2</code> shows line-by-line differences. Use <code>diff -u</code> for unified format.',
+  ln:    '<code>ln -s source link</code> creates a symbolic (soft) link. Useful for shortcuts.',
+  mount: 'Only root can mount filesystems. Use <code>df -h</code> to see mounted filesystems.',
+  cron:  '<code>crontab -e</code> edits your scheduled tasks. Format: min hour day month weekday command.',
+};
+
+// ── Command Implementations ───────────────────────────────────────────
+const COMMANDS = {
+
+  // Navigation
+  pwd() { return [cl(state.cwd, 'out-normal')]; },
+
+  ls(args) {
+    let showHidden = false, longFmt = false, target = state.cwd;
+    for (const a of args) {
+      if (a === '-a' || a === '-A') showHidden = true;
+      else if (a === '-l') longFmt = true;
+      else if (a === '-la' || a === '-al' || a === '-lA') { longFmt = true; showHidden = true; }
+      else if (!a.startsWith('-')) target = resolvePath(a);
+    }
+    const node = FS[target];
+    if (!node) return [cl(`ls: cannot access '${target}': No such file or directory`, 'out-error')];
+    if (node.type === 'file') return [cl(target.split('/').pop(), 'out-normal')];
+    let items = listDir(target);
+    if (!showHidden) items = items.filter(i => !i.name.startsWith('.'));
+    if (!items.length && !showHidden) items = [];
+    if (longFmt) {
+      const lines = [`total ${items.length * 4}`];
+      if (showHidden) {
+        lines.push(cl('drwxr-xr-x 2 student student 4096 ' + now() + ' .', 'out-normal'));
+        lines.push(cl('drwxr-xr-x 8 root    root    4096 ' + now() + ' ..', 'out-normal'));
+      }
+      for (const i of items) {
+        const size = i.type === 'file' ? (i.content ? i.content.length : 0).toString().padStart(6) : '  4096';
+        const name = i.type === 'dir' ? cl(i.name + '/', 'out-dir') : i.name.match(/\.(sh|py|rb|pl|js)$/) ? cl(i.name + '*', 'out-exec') : cl(i.name, 'out-normal');
+        lines.push(`${i.perm} 1 ${i.owner.padEnd(8)} ${i.group.padEnd(8)} ${size} ${i.mtime} ${name}`);
+      }
+      return lines;
+    }
+    if (!items.length) return [];
+    // Grid layout
+    const names = items.map(i => {
+      if (i.type === 'dir') return cl(i.name + '/', 'out-dir');
+      if (i.name.match(/\.(sh|py|rb|pl|js)$/)) return cl(i.name, 'out-exec');
+      return cl(i.name, 'out-normal');
+    });
+    return [names.join('  &nbsp; ')];
+  },
+
+  cd(args) {
+    let target = args[0] || '/home/student';
+    if (target === '-') { target = state.prevCwd || state.cwd; }
+    const resolved = resolvePath(target);
+    const node = FS[resolved];
+    if (!node) return [cl(`cd: ${target}: No such file or directory`, 'out-error')];
+    if (node.type !== 'dir') return [cl(`cd: ${target}: Not a directory`, 'out-error')];
+    if (resolved === '/root' && !state.isRoot) return [cl('cd: /root: Permission denied', 'out-error')];
+    state.prevCwd = state.cwd;
+    state.cwd = resolved;
+    updatePromptDisplay();
+    updateStatusBar();
+    renderFileTree();
+    return [];
+  },
+
+  // File operations
+  touch(args) {
+    if (!args.length) return [cl('touch: missing file operand', 'out-error')];
+    const created = [];
+    for (const a of args) {
+      const path = resolvePath(a);
+      if (!FS[path]) { FS[path] = { type: 'file', perm: '-rw-r--r--', owner: state.user, group: state.user, mtime: now(), content: '' }; created.push(a); }
+      else FS[path].mtime = now();
+    }
+    renderFileTree();
+    return created.length ? [] : [];
+  },
+
+  mkdir(args) {
+    if (!args.length) return [cl('mkdir: missing operand', 'out-error')];
+    const parents = args.includes('-p');
+    const targets = args.filter(a => !a.startsWith('-'));
+    const out = [];
+    for (const a of targets) {
+      const path = resolvePath(a);
+      if (FS[path]) { out.push(cl(`mkdir: cannot create directory '${a}': File exists`, 'out-error')); continue; }
+      FS[path] = { type: 'dir', perm: 'drwxr-xr-x', owner: state.user, group: state.user, mtime: now() };
+    }
+    renderFileTree();
+    return out;
+  },
+
+  rm(args) {
+    if (!args.length) return [cl('rm: missing operand', 'out-error')];
+    const recursive = args.some(a => a === '-r' || a === '-rf' || a === '-f' || a === '-R' || a === '-fr');
+    const force     = args.some(a => a === '-f' || a === '-rf' || a === '-fr');
+    const targets   = args.filter(a => !a.startsWith('-'));
+    const out = [];
+
+    if (targets.some(t => resolvePath(t) === '/') && recursive) {
+      return [
+        cl('rm: it is dangerous to operate recursively on /', 'out-error'),
+        cl("rm: use --no-preserve-root to override this failsafe", 'out-error'),
+        `<div class="edu-tip">🛡️ <strong>DANGER ZONE:</strong> In real Linux, <code>rm -rf /</code> would delete your entire system! This simulator protects you from this. This is a critical command to <strong>NEVER</strong> run on a real machine.</div>`
+      ];
+    }
+
+    for (const t of targets) {
+      const path = resolvePath(t);
+      if (!FS[path]) {
+        if (!force) out.push(cl(`rm: cannot remove '${t}': No such file or directory`, 'out-error'));
+        continue;
+      }
+      if (FS[path].type === 'dir' && !recursive) {
+        out.push(cl(`rm: cannot remove '${t}': Is a directory. Use -r to remove directories.`, 'out-error'));
+        continue;
+      }
+      // Remove entry and children
+      Object.keys(FS).filter(k => k === path || k.startsWith(path + '/')).forEach(k => delete FS[k]);
+    }
+    renderFileTree();
+    return out;
+  },
+
+  cp(args) {
+    const recursive = args.some(a => a === '-r' || a === '-R');
+    const targets = args.filter(a => !a.startsWith('-'));
+    if (targets.length < 2) return [cl('cp: missing destination file operand', 'out-error')];
+    const src = resolvePath(targets[0]), dst = resolvePath(targets[targets.length - 1]);
+    if (!FS[src]) return [cl(`cp: cannot stat '${targets[0]}': No such file or directory`, 'out-error')];
+    if (FS[src].type === 'dir' && !recursive) return [cl(`cp: -r not specified; omitting directory '${targets[0]}'`, 'out-error')];
+    const srcNode = FS[src];
+    const finalDst = FS[dst] && FS[dst].type === 'dir' ? dst + '/' + src.split('/').pop() : dst;
+    FS[finalDst] = { ...srcNode, mtime: now() };
+    if (srcNode.type === 'dir') {
+      Object.keys(FS).filter(k => k.startsWith(src + '/')).forEach(k => {
+        FS[finalDst + k.slice(src.length)] = { ...FS[k], mtime: now() };
+      });
+    }
+    renderFileTree();
+    return [];
+  },
+
+  mv(args) {
+    const targets = args.filter(a => !a.startsWith('-'));
+    if (targets.length < 2) return [cl('mv: missing destination file operand', 'out-error')];
+    const src = resolvePath(targets[0]), dst = resolvePath(targets[targets.length - 1]);
+    if (!FS[src]) return [cl(`mv: cannot stat '${targets[0]}': No such file or directory`, 'out-error')];
+    const finalDst = FS[dst] && FS[dst].type === 'dir' ? dst + '/' + src.split('/').pop() : dst;
+    FS[finalDst] = { ...FS[src], mtime: now() };
+    if (FS[src].type === 'dir') {
+      Object.keys(FS).filter(k => k.startsWith(src + '/')).forEach(k => {
+        FS[finalDst + k.slice(src.length)] = { ...FS[k] };
+        delete FS[k];
+      });
+    }
+    delete FS[src];
+    renderFileTree();
+    return [];
+  },
+
+  cat(args) {
+    if (!args.length) return [cl('cat: missing file operand', 'out-error')];
+    const showLineNumbers = args.includes('-n');
+    const files = args.filter(a => !a.startsWith('-'));
+    const out = [];
+    for (const f of files) {
+      const path = resolvePath(f);
+      const node = FS[path];
+      if (!node) { out.push(cl(`cat: ${f}: No such file or directory`, 'out-error')); continue; }
+      if (node.type === 'dir') { out.push(cl(`cat: ${f}: Is a directory`, 'out-error')); continue; }
+      const lines = (node.content || '').split('\n');
+      if (showLineNumbers) {
+        lines.forEach((l, i) => out.push(`<span class="out-dim">${String(i+1).padStart(6)}  </span>${escHtml(l)}`));
+      } else {
+        lines.forEach(l => out.push(escHtml(l) || ''));
+      }
+    }
+    return out;
+  },
+
+  head(args) {
+    const nIdx = args.indexOf('-n');
+    const n = nIdx !== -1 ? parseInt(args[nIdx + 1]) || 10 : 10;
+    const files = args.filter(a => !a.startsWith('-') && isNaN(Number(a)));
+    const out = [];
+    for (const f of files) {
+      const path = resolvePath(f);
+      const node = FS[path];
+      if (!node) { out.push(cl(`head: cannot open '${f}': No such file or directory`, 'out-error')); continue; }
+      const lines = (node.content || '').split('\n').slice(0, n);
+      lines.forEach(l => out.push(escHtml(l)));
+    }
+    return out;
+  },
+
+  tail(args) {
+    const follow = args.includes('-f');
+    const nIdx = args.indexOf('-n');
+    const n = nIdx !== -1 ? parseInt(args[nIdx + 1]) || 10 : 10;
+    const files = args.filter(a => !a.startsWith('-') && isNaN(Number(a)));
+    const out = [];
+    for (const f of files) {
+      const path = resolvePath(f);
+      const node = FS[path];
+      if (!node) { out.push(cl(`tail: cannot open '${f}': No such file or directory`, 'out-error')); continue; }
+      const lines = (node.content || '').split('\n');
+      lines.slice(-n).forEach(l => out.push(escHtml(l)));
+      if (follow) out.push(cl(`(Simulating tail -f — press Ctrl+C to stop)`, 'out-warn'));
+    }
+    return out;
+  },
+
+  less(args) { return COMMANDS.cat(args.filter(a => a !== '--quiet')); },
+  more(args) { return COMMANDS.cat(args); },
+
+  wc(args, stdin = []) {
+    const countLines = args.includes('-l'), countWords = args.includes('-w'), countBytes = args.includes('-c');
+    const files = args.filter(a => !a.startsWith('-'));
+    const out = [];
+
+    const processContent = (content, label) => {
+      const lines = content.split('\n').length;
+      const words = content.split(/\s+/).filter(Boolean).length;
+      const bytes = content.length;
+      if (countLines) out.push(`${String(lines).padStart(7)} ${label}`);
+      else if (countWords) out.push(`${String(words).padStart(7)} ${label}`);
+      else if (countBytes) out.push(`${String(bytes).padStart(7)} ${label}`);
+      else out.push(`${String(lines).padStart(7)} ${String(words).padStart(7)} ${String(bytes).padStart(7)} ${label}`);
+    };
+
+    if (!files.length && stdin.length) {
+      processContent(stdin.join('\n'), '');
+      return out;
+    }
+
+    for (const f of files) {
+      const path = resolvePath(f);
+      const node = FS[path];
+      if (!node) { out.push(cl(`wc: ${f}: No such file or directory`, 'out-error')); continue; }
+      processContent(node.content || '', f);
+    }
+    return out;
+  },
+
+  echo(args) {
+    const noNewline = args[0] === '-n';
+    const rawArgs = noNewline ? args.slice(1) : args;
+    // Handle redirection
+    const gtIdx = rawArgs.indexOf('>');
+    const appendIdx = rawArgs.indexOf('>>');
+    if (gtIdx !== -1) {
+      const text = rawArgs.slice(0, gtIdx).join(' ').replace(/^['"]|['"]$/g,'');
+      const file = resolvePath(rawArgs[gtIdx + 1]);
+      FS[file] = { type: 'file', perm: '-rw-r--r--', owner: state.user, group: state.user, mtime: now(), content: text + '\n' };
+      renderFileTree();
+      return [];
+    }
+    if (appendIdx !== -1) {
+      const text = rawArgs.slice(0, appendIdx).join(' ').replace(/^['"]|['"]$/g,'');
+      const file = resolvePath(rawArgs[appendIdx + 1]);
+      if (FS[file]) FS[file].content += text + '\n';
+      else FS[file] = { type: 'file', perm: '-rw-r--r--', owner: state.user, group: state.user, mtime: now(), content: text + '\n' };
+      return [];
+    }
+    const text = rawArgs.join(' ').replace(/^['"]|['"]$/g,'')
+      .replace(/\$(\w+)/g, (_, v) => state.env[v] || '');
+    return [escHtml(text)];
+  },
+
+  // Permissions
+  chmod(args) {
+    if (args.length < 2) return [cl('chmod: missing operand', 'out-error')];
+    const mode = args[0];
+    const files = args.slice(1).filter(a => !a.startsWith('-'));
+    const out = [];
+    for (const f of files) {
+      const path = resolvePath(f);
+      if (!FS[path]) { out.push(cl(`chmod: cannot access '${f}': No such file or directory`, 'out-error')); continue; }
+      // Numeric mode
+      if (/^\d+$/.test(mode)) {
+        const m = mode.padStart(3, '0');
+        const bits = m.split('').map(Number);
+        const toStr = n => [(n&4)?'r':'-', (n&2)?'w':'-', (n&1)?'x':'-'].join('');
+        const type = FS[path].type === 'dir' ? 'd' : '-';
+        FS[path].perm = type + toStr(bits[0]) + toStr(bits[1]) + toStr(bits[2]);
+        out.push(cl(`mode of '${f}' changed to ${mode} (${FS[path].perm})`, 'out-success'));
+      } else {
+        // Symbolic mode (simplified)
+        out.push(cl(`mode of '${f}' changed to ${mode}`, 'out-success'));
+      }
+    }
+    return out;
+  },
+
+  chown(args) {
+    if (!state.isRoot) return [cl('chown: changing ownership: Operation not permitted. Use sudo.', 'out-error')];
+    if (args.length < 2) return [cl('chown: missing operand', 'out-error')];
+    const [ownerGroup, ...files] = args.filter(a => !a.startsWith('-'));
+    const [owner, group] = ownerGroup.split(':');
+    for (const f of files) {
+      const path = resolvePath(f);
+      if (FS[path]) { FS[path].owner = owner; if (group) FS[path].group = group; }
+    }
+    return [cl(`ownership changed to ${ownerGroup}`, 'out-success')];
+  },
+
+  chgrp(args) {
+    if (args.length < 2) return [cl('chgrp: missing operand', 'out-error')];
+    const [group, ...files] = args.filter(a => !a.startsWith('-'));
+    for (const f of files) {
+      const path = resolvePath(f);
+      if (FS[path]) FS[path].group = group;
+    }
+    return [cl(`group changed to ${group}`, 'out-success')];
+  },
+
+  umask(args) {
+    if (!args.length) return [cl('0022', 'out-normal')];
+    return [cl(`umask set to ${args[0]}`, 'out-success')];
+  },
+
+  // Search
+  grep(args, stdin = []) {
+    const recursive = args.includes('-r') || args.includes('-R');
+    const ignoreCase = args.includes('-i');
+    const showNum = args.includes('-n');
+    const invert = args.includes('-v');
+    const count = args.includes('-c');
+    const clean = args.filter(a => !a.startsWith('-'));
+    if (clean.length < 1) return [cl('grep: missing pattern', 'out-error')];
+    const pattern = clean[0];
+    const targets = clean.slice(1);
+    const out = [];
+    const regex = new RegExp(pattern, ignoreCase ? 'gi' : 'g');
+
+    const searchLines = (lines, label) => {
+      let matchCount = 0;
+      lines.forEach((l, i) => {
+        const plainL = l.replace(/<[^>]+>/g, ''); // strip html from piped
+        const match = regex.test(plainL); regex.lastIndex = 0;
+        if (invert ? !match : match) {
+          matchCount++;
+          if (!count) {
+            const prefix = targets.length > 1 ? `<span class="out-accent">${escHtml(label)}:</span>` : '';
+            const lineNum = showNum ? `<span class="out-dim">${i+1}:</span>` : '';
+            const highlighted = escHtml(plainL).replace(new RegExp(escHtml(pattern), ignoreCase?'gi':'g'), m => `<span class="out-warn">${m}</span>`);
+            out.push(`${prefix}${lineNum}${highlighted}`);
+          }
+        }
+      });
+      if (count) out.push(cl(String(matchCount), 'out-normal'));
+    };
+
+    const searchFile = (path, label) => {
+      const node = FS[path];
+      if (!node || node.type !== 'file') return;
+      searchLines((node.content || '').split('\n'), label);
+    };
+
+    // Piped stdin
+    if (stdin.length && !targets.length && !recursive) {
+      searchLines(stdin.map(l => l.replace(/<[^>]+>/g,'')), 'stdin');
+      return out.length ? out : [cl('(no matches)', 'out-dim')];
+    }
+
+    if (recursive) {
+      const baseDir = targets[0] ? resolvePath(targets[0]) : state.cwd;
+      Object.keys(FS).filter(k => k.startsWith(baseDir) && FS[k].type === 'file').forEach(k => searchFile(k, k));
+    } else if (targets.length) {
+      targets.forEach(t => searchFile(resolvePath(t), t));
+    } else {
+      return [cl('grep: missing file operand (try -r for recursive search)', 'out-warn')];
+    }
+    return out.length ? out : [cl('(no matches found)', 'out-dim')];
+  },
+
+  find(args) {
+    const base = args[0] && !args[0].startsWith('-') ? resolvePath(args[0]) : state.cwd;
+    const nameIdx = args.indexOf('-name');
+    const typeIdx = args.indexOf('-type');
+    const name = nameIdx !== -1 ? args[nameIdx + 1] : null;
+    const typeFilter = typeIdx !== -1 ? args[typeIdx + 1] : null;
+    const out = [];
+    Object.keys(FS).filter(k => k.startsWith(base)).forEach(k => {
+      const node = FS[k];
+      if (typeFilter === 'f' && node.type !== 'file') return;
+      if (typeFilter === 'd' && node.type !== 'dir') return;
+      const fname = k.split('/').pop();
+      if (name && !matchesGlob(fname, name)) return;
+      out.push(cl(k, node.type === 'dir' ? 'out-dir' : 'out-normal'));
+    });
+    return out.length ? out : [cl('(nothing found)', 'out-dim')];
+  },
+
+  which(args) {
+    if (!args.length) return [cl('which: missing argument', 'out-error')];
+    const found = Object.keys(COMMANDS);
+    return args.map(a => found.includes(a) ? cl(`/usr/bin/${a}`, 'out-normal') : cl(`which: no ${a} in (/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin)`, 'out-error'));
+  },
+
+  whereis(args) {
+    if (!args.length) return [cl('whereis: missing argument', 'out-error')];
+    return args.map(a => `${a}: /usr/bin/${a} /usr/share/man/man1/${a}.1.gz`);
+  },
+
+  locate(args) {
+    if (!args.length) return [cl('locate: missing argument', 'out-error')];
+    const pattern = args[0];
+    const out = [];
+    Object.keys(FS).forEach(k => {
+      if (k.includes(pattern)) out.push(cl(k, 'out-normal'));
+    });
+    return out.length ? out : [cl(`locate: ${pattern}: No match found`, 'out-warn')];
+  },
+
+  // System Info
+  whoami() { return [cl(state.user, 'out-normal')]; },
+
+  id(args) {
+    if (state.isRoot) return [cl('uid=0(root) gid=0(root) groups=0(root)', 'out-normal')];
+    return [cl('uid=1000(student) gid=1000(student) groups=1000(student),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev)', 'out-normal')];
+  },
+
+  groups() { return state.isRoot ? [cl('root', 'out-normal')] : [cl('student adm cdrom sudo dip plugdev', 'out-normal')]; },
+
+  uname(args) {
+    const all = args.includes('-a');
+    const kernel = args.includes('-r');
+    if (all) return [cl('Linux kali 6.6.0-kali3-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.6.9-1kali1 x86_64 x86_64 x86_64 GNU/Linux', 'out-normal')];
+    if (kernel) return [cl('6.6.0-kali3-amd64', 'out-normal')];
+    return [cl('Linux', 'out-normal')];
+  },
+
+  hostname(args) {
+    if (args.length && !args[0].startsWith('-')) { state.hostname = args[0]; updatePromptDisplay(); return []; }
+    return [cl(state.hostname, 'out-normal')];
+  },
+
+  uptime() { return [cl(' 10:42:17 up 2:14,  1 user,  load average: 0.34, 0.28, 0.21', 'out-normal')]; },
+
+  date(args) {
+    const d = new Date();
+    if (args.includes('+%Y')) return [cl(d.getFullYear().toString(), 'out-normal')];
+    return [cl(d.toString(), 'out-normal')];
+  },
+
+  cal() {
+    const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    let out = [`<span class="out-accent">   ${months[m]} ${y}</span>`, '<span class="out-dim">Su Mo Tu We Th Fr Sa</span>'];
+    let row = '   '.repeat(first);
+    for (let i = 1; i <= days; i++) {
+      row += String(i).padStart(2);
+      if ((i + first) % 7 === 0 || i === days) { out.push(escHtml(row)); row = ''; } else row += ' ';
+    }
+    return out;
+  },
+
+  // Process
+  ps(args) {
+    const aux = args.some(a => a.includes('a') || a.includes('u') || a.includes('x'));
+    const header = `<span class="out-dim">  PID TTY          TIME CMD</span>`;
+    const header2 = `<span class="out-dim">USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND</span>`;
+    if (aux) return [
+      header2,
+      `root           1  0.0  0.1 169552 10556 ?        Ss   10:00   0:03 /sbin/init`,
+      `root         350  0.0  0.0  14448  3148 ?        Ss   10:00   0:00 /usr/sbin/sshd`,
+      `${state.user}     1337  0.0  0.1  21592  5120 pts/0   Ss   10:42   0:00 -bash`,
+      `${state.user}     1338  0.0  0.0  19340  2400 pts/0   R+   10:42   0:00 ps aux`,
+    ];
+    return [header, `1337 pts/0    00:00:00 bash`, `1338 pts/0    00:00:00 ps`];
+  },
+
+  top() {
+    return [
+      cl('top - ' + new Date().toLocaleTimeString() + ' up 2:14,  1 user,  load average: 0.34, 0.28, 0.21', 'out-normal'),
+      cl('Tasks:   3 total,   1 running,   2 sleeping,   0 stopped,   0 zombie', 'out-normal'),
+      cl('%Cpu(s):  2.3 us,  0.8 sy,  0.0 ni, 96.5 id,  0.3 wa,  0.0 hi,  0.1 si', 'out-normal'),
+      cl('MiB Mem :   7849.4 total,   5231.2 free,   1823.3 used,    794.9 buff/cache', 'out-normal'),
+      cl('MiB Swap:   2048.0 total,   2048.0 free,      0.0 used.   5743.2 avail Mem', 'out-normal'),
+      '',
+      `<span class="out-dim">  PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND</span>`,
+      `<span class="out-accent"> 1337</span> ${state.user.padEnd(9)} 20   0   21592   5120   3840 S   0.3   0.1   0:00.12 bash`,
+      `    1 root      20   0  169552  10556   8192 S   0.0   0.1   0:03.45 systemd`,
+      `  350 root      20   0   14448   3148   2560 S   0.0   0.0   0:00.02 sshd`,
+      cl('(Simulated — interactive top not available. Ctrl+C to exit)', 'out-dim'),
+    ];
+  },
+
+  kill(args) {
+    const sig = args.find(a => a.startsWith('-')) || '-15';
+    const pids = args.filter(a => !a.startsWith('-'));
+    if (!pids.length) return [cl('kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]', 'out-error')];
+    return pids.map(p => cl(`kill: (${p}): sent signal ${sig.replace('-','')}`, 'out-normal'));
+  },
+
+  jobs() { return [cl('(no active jobs)', 'out-dim')]; },
+
+  // Users & Auth
+  'sudo'(args) {
+    if (!args.length) return [cl('usage: sudo command [args...]', 'out-error')];
+    if (args[0] === 'su' || args[0] === '-s' && args[1] === '/bin/bash') {
+      return runSudoSu();
+    }
+    return runWithSudo(args);
+  },
+
+  su(args) {
+    const targetUser = args.find(a => !a.startsWith('-')) || 'root';
+    if (targetUser === 'root' || args.includes('-')) {
+      return runSudoSu();
+    }
+    return [cl(`su: user ${targetUser} does not exist`, 'out-error')];
+  },
+
+  passwd(args) {
+    const target = args[0] || state.user;
+    appendLine(cl(`Changing password for ${target}.`, 'out-normal'));
+    appendLine(cl('Current password: ', 'out-warn'));
+    state.awaitingPassword = 'passwd-current';
+    state.passwordCallback = (pwd) => {
+      if (pwd !== state.password && !state.isRoot) {
+        appendLine(cl('passwd: Authentication failure', 'out-error'));
+        return;
+      }
+      appendLine(cl('New password: ', 'out-warn'));
+      state.awaitingPassword = 'passwd-new';
+      state.newPasswd = null;
+      state.passwordCallback = (newpwd) => {
+        state.newPasswd = newpwd;
+        appendLine(cl('Retype new password: ', 'out-warn'));
+        state.awaitingPassword = 'passwd-confirm';
+        state.passwordCallback = (confirm) => {
+          if (confirm !== state.newPasswd) { appendLine(cl('Sorry, passwords do not match.', 'out-error')); }
+          else { state.password = state.newPasswd; appendLine(cl('passwd: password updated successfully', 'out-success')); }
+          state.awaitingPassword = false;
+        };
+      };
+    };
+    setInputType('password');
+    return [];
+  },
+
+  useradd(args) {
+    if (!state.isRoot) return [cl('useradd: Permission denied. Use sudo.', 'out-error')];
+    const user = args.find(a => !a.startsWith('-'));
+    if (!user) return [cl('useradd: missing username', 'out-error')];
+    FS[`/home/${user}`] = { type:'dir', perm:'drwxr-xr-x', owner: user, group: user, mtime: now() };
+    return [cl(`useradd: user '${user}' created`, 'out-success')];
+  },
+
+  adduser(args) { return COMMANDS.useradd(args); },
+
+  userdel(args) {
+    if (!state.isRoot) return [cl('userdel: Permission denied. Use sudo.', 'out-error')];
+    const user = args.find(a => !a.startsWith('-'));
+    return [cl(`userdel: user '${user}' removed (simulated)`, 'out-success')];
+  },
+
+  // Network (simulated)
+  ping(args) {
+    const host = args.find(a => !a.startsWith('-')) || 'localhost';
+    const count = parseInt(args[args.indexOf('-c') + 1]) || 4;
+    const out = [cl(`PING ${host} (93.184.216.34): 56 data bytes`, 'out-normal')];
+    for (let i = 0; i < Math.min(count, 4); i++) {
+      const ms = (Math.random() * 20 + 10).toFixed(3);
+      out.push(cl(`64 bytes from 93.184.216.34: icmp_seq=${i} ttl=56 time=${ms} ms`, 'out-normal'));
+    }
+    out.push('');
+    out.push(cl(`--- ${host} ping statistics ---`, 'out-normal'));
+    out.push(cl(`${Math.min(count,4)} packets transmitted, ${Math.min(count,4)} received, 0% packet loss`, 'out-success'));
+    return out;
+  },
+
+  ifconfig() {
+    return [
+      `<span class="out-accent">eth0:</span> flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500`,
+      `        inet <span class="out-success">192.168.1.100</span>  netmask 255.255.255.0  broadcast 192.168.1.255`,
+      `        inet6 fe80::a00:27ff:fe4e:66a1  prefixlen 64  scopeid 0x20&lt;link&gt;`,
+      `        ether 08:00:27:4e:66:a1  txqueuelen 1000  (Ethernet)`,
+      `        RX packets 2841  bytes 3742910 (3.5 MiB)`,
+      `        TX packets 1523  bytes 180142 (175.9 KiB)`,
+      ``,
+      `<span class="out-accent">lo:</span>      flags=73&lt;UP,LOOPBACK,RUNNING&gt;  mtu 65536`,
+      `        inet <span class="out-info">127.0.0.1</span>  netmask 255.0.0.0`,
+      `        loop  txqueuelen 1000  (Local Loopback)`,
+    ];
+  },
+
+  'ip'(args) {
+    if (args[0] === 'a' || args[0] === 'addr') return COMMANDS.ifconfig();
+    if (args[0] === 'route' || args[0] === 'r') return [
+      `default via 192.168.1.1 dev eth0 proto dhcp src 192.168.1.100 metric 100`,
+      `192.168.1.0/24 dev eth0 proto kernel scope link src 192.168.1.100`,
+    ];
+    return [cl(`ip: unknown command '${args[0] || ''}'`, 'out-error')];
+  },
+
+  netstat(args) {
+    return [
+      `<span class="out-dim">Active Internet connections (only servers)</span>`,
+      `<span class="out-dim">Proto Recv-Q Send-Q Local Address           Foreign Address         State</span>`,
+      `tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN`,
+      `tcp6       0      0 :::80                   :::*                    LISTEN`,
+      `udp        0      0 0.0.0.0:68              0.0.0.0:*`,
+    ];
+  },
+
+  curl(args) {
+    const url = args.find(a => !a.startsWith('-'));
+    if (!url) return [cl('curl: no URL specified!', 'out-error')];
+    return [cl(`(Simulated) curl: connecting to ${url}...`, 'out-dim'), cl(`curl: (6) Could not resolve host: ${url} (network disabled in simulator)`, 'out-warn')];
+  },
+
+  wget(args) {
+    const url = args.find(a => !a.startsWith('-'));
+    if (!url) return [cl('wget: missing URL', 'out-error')];
+    return [cl(`--2025-06-16 10:42:17--  ${url}`, 'out-dim'), cl(`(Simulated) Network access is disabled in this simulator.`, 'out-warn')];
+  },
+
+  nmap(args) {
+    const target = args.find(a => !a.startsWith('-')) || 'localhost';
+    return [
+      cl(`Starting Nmap 7.94 ( https://nmap.org ) at ${new Date().toLocaleString()}`, 'out-dim'),
+      cl(`Nmap scan report for ${target} (127.0.0.1)`, 'out-normal'),
+      cl(`Host is up (0.00023s latency).`, 'out-success'),
+      `<span class="out-dim">PORT     STATE SERVICE VERSION</span>`,
+      `22/tcp   open  ssh     OpenSSH 9.2p1 Debian (protocol 2.0)`,
+      `80/tcp   open  http    Apache httpd 2.4.57`,
+      `443/tcp  open  https   Apache httpd 2.4.57`,
+      cl(`\nNmap done: 1 IP address (1 host up) scanned in 0.42 seconds`, 'out-dim'),
+      `<div class="edu-tip">⚠️ <strong>Legal note:</strong> Running nmap on networks without permission is illegal. Always get written authorization before scanning!</div>`,
+    ];
+  },
+
+  ssh(args) {
+    const host = args.find(a => !a.startsWith('-') && a.includes('@') || (!a.startsWith('-') && args.indexOf(a) > 0));
+    return [
+      cl(`ssh: connect to host ${host || 'remote'} port 22: Connection refused (network disabled in simulator)`, 'out-warn'),
+      `<div class="edu-tip">💡 SSH syntax: <code>ssh user@hostname</code> or <code>ssh -p 2222 user@host</code></div>`,
+    ];
+  },
+
+  // Archive
+  tar(args) {
+    const create = args.some(a => a.includes('c'));
+    const extract = args.some(a => a.includes('x'));
+    const file = args.find(a => a.endsWith('.tar.gz') || a.endsWith('.tar') || a.endsWith('.tgz'));
+    if (create) {
+      const targets = args.filter(a => !a.startsWith('-') && a !== file);
+      return [cl(`${file}: Created archive (simulated)`, 'out-success'), ...targets.map(t => cl(`  adding: ${t}`, 'out-dim'))];
+    }
+    if (extract) return [cl(`${file}: Extracted (simulated)`, 'out-success')];
+    return [cl('tar: You must specify one of the -Acdtrux, --delete or --test-label options', 'out-error')];
+  },
+
+  zip(args) {
+    const zipFile = args[0]; const targets = args.slice(1);
+    if (!zipFile) return [cl('zip: missing zipfile operand', 'out-error')];
+    return [cl(`  adding: ${targets.join(', ')}`, 'out-normal'), cl(`  result: ${zipFile} (${Math.floor(Math.random()*50)+20}% compressed)`, 'out-success')];
+  },
+
+  unzip(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    return [cl(`Archive: ${file}`, 'out-normal'), cl(`  extracting: file1.txt`, 'out-normal'), cl(`  extracting: file2.txt`, 'out-normal'), cl(`(Simulated extraction)`, 'out-dim')];
+  },
+
+  gzip(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    return files.map(f => cl(`${f}: compressed (simulated)`, 'out-success'));
+  },
+
+  gunzip(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    return files.map(f => cl(`${f}: decompressed (simulated)`, 'out-success'));
+  },
+
+  // History
+  history(args) {
+    if (!state.history.length) return [cl('(no commands in history)', 'out-dim')];
+    return state.history.map((c, i) => `  <span class="out-dim">${String(i + 1).padStart(4)}</span>  ${escHtml(c)}`);
+  },
+
+  // Environment
+  env() {
+    return Object.entries(state.env).map(([k, v]) => `<span class="out-accent">${k}</span>=<span class="out-normal">${escHtml(v)}</span>`);
+  },
+
+  export(args) {
+    if (!args.length) return COMMANDS.env();
+    for (const a of args) {
+      const [k, v] = a.split('=');
+      if (v !== undefined) state.env[k] = v;
+    }
+    return [];
+  },
+
+  unset(args) {
+    for (const a of args) delete state.env[a];
+    return [];
+  },
+
+  alias(args) {
+    if (!args.length) return Object.entries(state.aliases).map(([k, v]) => `alias ${cl(k,'out-accent')}='${escHtml(v)}'`);
+    for (const a of args) {
+      const eq = a.indexOf('=');
+      if (eq !== -1) state.aliases[a.slice(0, eq)] = a.slice(eq + 1).replace(/^['"]|['"]$/g, '');
+    }
+    return [];
+  },
+
+  unalias(args) {
+    args.forEach(a => delete state.aliases[a]);
+    return [];
+  },
+
+  // Text processing
+  sort(args) {
+    const reverse = args.includes('-r');
+    const numeric = args.includes('-n');
+    const unique = args.includes('-u');
+    const files = args.filter(a => !a.startsWith('-'));
+    if (!files.length) return [cl('sort: reading from stdin (not supported, provide a file)', 'out-warn')];
+    const path = resolvePath(files[0]);
+    if (!FS[path]) return [cl(`sort: cannot read: ${files[0]}: No such file or directory`, 'out-error')];
+    let lines = (FS[path].content || '').split('\n');
+    if (unique) lines = [...new Set(lines)];
+    lines.sort(numeric ? (a,b)=>parseFloat(a)-parseFloat(b) : undefined);
+    if (reverse) lines.reverse();
+    return lines.map(l => escHtml(l));
+  },
+
+  uniq(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    if (!files.length) return [cl('uniq: reading from stdin (provide a file)', 'out-warn')];
+    const path = resolvePath(files[0]);
+    if (!FS[path]) return [cl(`uniq: ${files[0]}: No such file or directory`, 'out-error')];
+    const lines = (FS[path].content || '').split('\n');
+    const result = lines.filter((l, i) => i === 0 || l !== lines[i-1]);
+    return result.map(escHtml);
+  },
+
+  diff(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    if (files.length < 2) return [cl('diff: missing operand', 'out-error')];
+    const [p1, p2] = files.map(f => resolvePath(f));
+    if (!FS[p1]) return [cl(`diff: ${files[0]}: No such file or directory`, 'out-error')];
+    if (!FS[p2]) return [cl(`diff: ${files[1]}: No such file or directory`, 'out-error')];
+    const l1 = (FS[p1].content || '').split('\n');
+    const l2 = (FS[p2].content || '').split('\n');
+    const out = [];
+    const maxLen = Math.max(l1.length, l2.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (l1[i] !== l2[i]) {
+        if (l1[i] !== undefined) out.push(cl(`< ${l1[i]}`, 'out-error'));
+        if (l2[i] !== undefined) out.push(cl(`> ${l2[i]}`, 'out-success'));
+      }
+    }
+    return out.length ? out : [cl('(files are identical)', 'out-dim')];
+  },
+
+  cut(args) {
+    const dIdx = args.indexOf('-d'); const fIdx = args.indexOf('-f');
+    const delim = dIdx !== -1 ? args[dIdx+1] : '\t';
+    const field = fIdx !== -1 ? parseInt(args[fIdx+1]) - 1 : 0;
+    const files = args.filter(a => !a.startsWith('-'));
+    if (!files.length) return [cl('cut: missing file', 'out-error')];
+    const path = resolvePath(files[0]);
+    if (!FS[path]) return [cl(`cut: ${files[0]}: No such file or directory`, 'out-error')];
+    return (FS[path].content || '').split('\n').map(l => cl(l.split(delim)[field] || '', 'out-normal'));
+  },
+
+  tr(args) { return [cl('(simulated tr — no stdin support in this simulator)', 'out-dim')]; },
+  sed(args) { return [cl('(simulated sed — file transformation not shown in output)', 'out-dim')]; },
+  awk(args) { return [cl('(simulated awk — complex processing not available in this simulator)', 'out-dim')]; },
+
+  // Links
+  ln(args) {
+    const sym = args.includes('-s');
+    const targets = args.filter(a => !a.startsWith('-'));
+    if (targets.length < 2) return [cl('ln: missing operand', 'out-error')];
+    const [src, dst] = targets;
+    const srcPath = resolvePath(src), dstPath = resolvePath(dst);
+    if (!FS[srcPath]) return [cl(`ln: failed to access '${src}': No such file or directory`, 'out-error')];
+    FS[dstPath] = { ...FS[srcPath], perm: FS[srcPath].perm, mtime: now(), symlink: sym ? srcPath : null };
+    return [cl(`${sym ? 'symbolic' : 'hard'} link '${dst}' -> '${src}' created`, 'out-success')];
+  },
+
+  // Misc system
+  clear() { terminal.innerHTML = ''; return []; },
+
+  exit(args) {
+    if (state.isRoot) {
+      state.isRoot = false;
+      state.user = 'student';
+      state.cwd = '/home/student';
+      state.env.USER = 'student';
+      state.env.HOME = '/home/student';
+      updatePromptDisplay();
+      updateStatusBar();
+      return [cl('exit (back to student)', 'out-dim')];
+    }
+    return [cl('exit: Cannot close simulator. Close the browser tab instead.', 'out-dim')];
+  },
+
+  man(args) {
+    const cmd = args[0];
+    if (!cmd) return [cl('What manual page do you want?', 'out-error')];
+    const manPages = {
+      ls:    'LS(1) — list directory contents. Options: -l long, -a all (hidden), -h human readable, -r reverse, -t sort by time.',
+      cd:    'CD(1) — change directory. Usage: cd [dir]. cd ~ home, cd .. up, cd - previous.',
+      pwd:   'PWD(1) — print name of current/working directory.',
+      cat:   'CAT(1) — concatenate files and print to stdout. -n number lines.',
+      rm:    'RM(1) — remove files or directories. -r recursive, -f force, -i interactive.',
+      mkdir: 'MKDIR(1) — make directories. -p create parents as needed.',
+      chmod: 'CHMOD(1) — change file mode bits. Numeric: chmod 755 file. Symbolic: chmod u+x file.',
+      grep:  'GREP(1) — print lines that match patterns. -r recursive, -i ignore case, -n line numbers, -v invert.',
+      find:  'FIND(1) — search for files. find [path] [-name pattern] [-type f|d].',
+      sudo:  'SUDO(1) — execute a command as another user (usually root).',
+      ssh:   'SSH(1) — OpenSSH remote login client. Usage: ssh user@host [-p port].',
+      tar:   'TAR(1) — tape archiver. -c create, -x extract, -z gzip, -f file, -v verbose.',
+      nano:  'NANO(1) — simple text editor. Ctrl+O save, Ctrl+X exit, Ctrl+W search.',
+      ping:  'PING(8) — send ICMP ECHO_REQUEST to network hosts. -c count.',
+      nmap:  'NMAP(1) — network exploration tool and security/port scanner.',
+      passwd:'PASSWD(1) — change user password. Only root can change other users passwords.',
+    };
+    if (manPages[cmd]) {
+      return [
+        cl(`Manual page for: ${cmd}`, 'out-accent'),
+        cl('─'.repeat(50), 'out-dim'),
+        cl(manPages[cmd], 'out-normal'),
+        cl('─'.repeat(50), 'out-dim'),
+        cl('(Press q to exit — simulated)', 'out-dim'),
+      ];
+    }
+    return [cl(`No manual entry for ${cmd}`, 'out-warn')];
+  },
+
+  help() {
+    return [
+      cl('⚡ Cyber Assassins — Available Commands', 'out-accent'),
+      cl('─'.repeat(50), 'out-dim'),
+      `<span class="out-info">Navigation:</span>  pwd, ls, cd, tree`,
+      `<span class="out-info">Files:</span>       touch, mkdir, rm, cp, mv, cat, less, more, head, tail, wc, echo`,
+      `<span class="out-info">Edit:</span>        nano (interactive editor)`,
+      `<span class="out-info">Permissions:</span> chmod, chown, chgrp, umask`,
+      `<span class="out-info">Search:</span>      grep, find, locate, which, whereis`,
+      `<span class="out-info">System:</span>      whoami, id, groups, uname, hostname, uptime, date, cal`,
+      `<span class="out-info">Processes:</span>   ps, top, kill, jobs`,
+      `<span class="out-info">Users:</span>       sudo, su, passwd, useradd, userdel, adduser`,
+      `<span class="out-info">Network:</span>     ping, ifconfig, ip, netstat, curl, wget, nmap, ssh`,
+      `<span class="out-info">Archive:</span>     tar, zip, unzip, gzip, gunzip`,
+      `<span class="out-info">Text:</span>        sort, uniq, diff, cut, tr, sed, awk, grep`,
+      `<span class="out-info">Links:</span>       ln`,
+      `<span class="out-info">Env:</span>         env, export, unset, alias, unalias`,
+      `<span class="out-info">History:</span>     history, !!`,
+      `<span class="out-info">Other:</span>       clear, exit, man, help, tree, df, du, lsblk`,
+      cl('─'.repeat(50), 'out-dim'),
+      `<span class="out-dim">Tips: Tab to autocomplete · ↑↓ for history · Ctrl+L to clear</span>`,
+      `<span class="out-dim">Click 📋 Commands button for the full cheatsheet panel</span>`,
+    ];
+  },
+
+  tree(args) {
+    const base = args[0] ? resolvePath(args[0]) : state.cwd;
+    if (!FS[base]) return [cl(`tree: ${base}: No such file or directory`, 'out-error')];
+    const lines = [cl(displayPath(base), 'out-dir')];
+    const renderTree = (path, prefix) => {
+      const children = listDir(path);
+      children.forEach((child, idx) => {
+        const isLast = idx === children.length - 1;
+        const connector = isLast ? '└── ' : '├── ';
+        const name = child.type === 'dir' ? cl(child.name + '/', 'out-dir') : cl(child.name, 'out-normal');
+        lines.push(prefix + connector + name);
+        if (child.type === 'dir') renderTree(child.path, prefix + (isLast ? '    ' : '│   '));
+      });
+    };
+    renderTree(base, '');
+    return lines;
+  },
+
+  df(args) {
+    const human = args.includes('-h');
+    return [
+      `<span class="out-dim">Filesystem     ${human?'Size  Used Avail Use%':'1K-blocks    Used Available Use%'} Mounted on</span>`,
+      `udev           ${human?'3.8G     0  3.8G   0%':'3967048       0   3967048   0%'} /dev`,
+      `/dev/sda1      ${human?' 50G   12G   38G  24%':'52428800 12582912  39845888  24%'} /`,
+      `tmpfs          ${human?'3.8G  1.2M  3.8G   1%':'3972456    1248   3971208   1%'} /run`,
+    ];
+  },
+
+  du(args) {
+    const human = args.includes('-h');
+    const target = args.find(a => !a.startsWith('-')) || '.';
+    return [cl(`${human?'12K':'12288'}\t${target}`, 'out-normal')];
+  },
+
+  lsblk() {
+    return [
+      `<span class="out-dim">NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS</span>`,
+      `sda      8:0    0   50G  0 disk`,
+      `├─sda1   8:1    0   49G  0 part /`,
+      `└─sda2   8:2    0    1G  0 part [SWAP]`,
+      `sr0     11:0    1 1024M  0 rom`,
+    ];
+  },
+
+  mount() { return [cl('sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)\nproc on /proc type proc (rw,nosuid,nodev,noexec,relatime)\n/dev/sda1 on / type ext4 (rw,relatime)', 'out-normal')]; },
+
+  dmesg(args) {
+    return [
+      cl('[    0.000000] Linux version 6.6.0-kali3-amd64', 'out-dim'),
+      cl('[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.6.0', 'out-dim'),
+      cl('[    1.234567] eth0: renamed from veth1234', 'out-dim'),
+      cl('[    2.345678] systemd[1]: Started System Logging Service.', 'out-dim'),
+    ];
+  },
+
+  crontab(args) {
+    if (args.includes('-e')) return [cl('(Simulated crontab editor — use nano to edit /etc/crontab)', 'out-dim')];
+    if (args.includes('-l')) return [cl('# No crontab for ' + state.user, 'out-dim')];
+    return [cl('usage: crontab [-u user] [-l | -r | -e]', 'out-error')];
+  },
+
+  // Kali-specific tools
+  metasploit() { return [cl('Starting Metasploit Framework (simulated)...', 'out-accent'), cl('       =[ metasploit v6.3.44-dev-...', 'out-normal'), cl('+ -- --=[ 2376 exploits - 1233 auxiliary - 416 post ]', 'out-normal'), cl('(This is a simulator — no real exploits run here!)', 'out-warn')]; },
+  msfconsole() { return COMMANDS.metasploit(); },
+  john(args)   { return [cl('John the Ripper (simulated)\nLoaded 1 password hash (MD5)\nGuesses: 0  Time: 0:00:00:00 DONE (simulated)', 'out-normal')]; },
+  hydra(args)  { return [cl('Hydra (simulated)\n[DATA] max 1 task per 1 server\n[DATA] attacking service on port 22\n(Simulated — no real attacks performed)', 'out-warn')]; },
+  'aircrack-ng'() { return [cl('Aircrack-ng (simulated)\nOpening handshake file...\n[00:00:00] 0 keys tested (0.00 k/s)\nNo results (simulated environment)', 'out-warn')]; },
+  wireshark()  { return [cl('wireshark: This is a GUI application. Cannot launch in terminal simulator.', 'out-warn'), cl('Try: tshark -i eth0 (command-line alternative)', 'out-dim')]; },
+  hashcat(args) { return [cl('hashcat (simulated) v6.2.6\nSession..........: hashcat (simulated)\nStatus...........: Cracked\nHash.Mode........: 0 (MD5)\n(No real cracking performed)', 'out-warn')]; },
+  sqlmap(args) { return [cl('sqlmap (simulated) v1.8\nTesting for SQL injection...\n(No real testing performed — always get authorization first!)', 'out-warn')]; },
+  nikto(args)  { return [cl('Nikto v2.1.6 (simulated)\nScanning target...\n(Simulated — always get authorization before scanning!)', 'out-warn')]; },
+  burpsuite()  { return [cl('Burp Suite is a GUI application. Cannot launch in terminal.', 'out-warn')]; },
+
+  // Nano editor
+  nano(args) {
+    const filename = args.find(a => !a.startsWith('-')) || 'untitled';
+    const path = resolvePath(filename);
+    openNano(path, filename);
+    return [];
+  },
+
+  vi(args)  { return COMMANDS.nano(args); },
+  vim(args) { return COMMANDS.nano(args); },
+
+  // Special
+  '!!'() {
+    if (state.history.length < 2) return [cl('bash: !!: event not found', 'out-error')];
+    const lastCmd = state.history[state.history.length - 2];
+    return processCommand(lastCmd, true);
+  },
+
+  xargs(args) { return [cl('xargs: (simulated — combine with pipes)', 'out-dim')]; },
+
+  tee(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    if (file) {
+      const path = resolvePath(file);
+      FS[path] = { type:'file', perm:'-rw-r--r--', owner:state.user, group:state.user, mtime:now(), content:'(tee output)' };
+      return [cl(`(Simulated: output also written to ${file})`, 'out-dim')];
+    }
+    return [cl('tee: missing file operand', 'out-error')];
+  },
+
+  watch(args) {
+    const interval = args.includes('-n') ? args[args.indexOf('-n')+1] : 2;
+    const cmd = args.filter(a => !a.startsWith('-') && isNaN(Number(a))).join(' ');
+    return [cl(`Every ${interval}s: ${cmd}`, 'out-dim'), cl('(Simulated watch — not interactive)', 'out-warn')];
+  },
+
+  sleep(args) {
+    const s = parseFloat(args[0]) || 1;
+    return [cl(`(Simulated: sleeping ${s} second${s!==1?'s':''})`, 'out-dim')];
+  },
+
+  yes(args) {
+    const word = args[0] || 'y';
+    return Array.from({length: 10}, () => cl(word, 'out-normal')).concat([cl('(Ctrl+C to stop — simulated)', 'out-dim')]);
+  },
+
+  seq(args) {
+    let start = 1, end = 1, step = 1;
+    if (args.length === 1) end = parseInt(args[0]);
+    else if (args.length === 2) { start = parseInt(args[0]); end = parseInt(args[1]); }
+    else if (args.length === 3) { start = parseInt(args[0]); step = parseInt(args[1]); end = parseInt(args[2]); }
+    const out = [];
+    for (let i = start; i <= end; i += step) out.push(cl(String(i), 'out-normal'));
+    return out.slice(0, 100);
+  },
+
+  shuf(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    if (file) {
+      const p = resolvePath(file);
+      if (!FS[p]) return [cl(`shuf: ${file}: No such file`, 'out-error')];
+      const lines = (FS[p].content || '').split('\n').filter(Boolean);
+      for (let i = lines.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [lines[i],lines[j]] = [lines[j],lines[i]]; }
+      return lines.map(escHtml);
+    }
+    const n = parseInt(args[args.indexOf('-i')+1]) || 10;
+    return Array.from({length: parseInt(args[args.indexOf('-n')+1]) || 5}, () => Math.floor(Math.random()*n)+1).map(String).map(escHtml);
+  },
+
+  factor(args) {
+    const n = parseInt(args[0]);
+    if (!n || n < 1) return [cl('factor: invalid number', 'out-error')];
+    const factors = [];
+    let num = n;
+    for (let i = 2; i <= Math.sqrt(num); i++) while (num % i === 0) { factors.push(i); num /= i; }
+    if (num > 1) factors.push(num);
+    return [cl(`${n}: ${factors.join(' ')}`, 'out-normal')];
+  },
+
+  bc(args) { return [cl('bc: arbitrary precision calculator (interactive mode not supported)\nHint: Try using shell arithmetic: echo $((2+2))', 'out-dim')]; },
+
+  printf(args) {
+    if (!args.length) return [cl('printf: missing format string', 'out-error')];
+    const fmt = args[0].replace(/\\n/g,'\n').replace(/\\t/g,'\t');
+    return [cl(fmt, 'out-normal')];
+  },
+
+  column(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    if (!file) return [cl('column: missing operand', 'out-error')];
+    const p = resolvePath(file);
+    if (!FS[p]) return [cl(`column: ${file}: No such file`, 'out-error')];
+    return (FS[p].content || '').split('\n').map(l => l.split(/\s+/).map(w => w.padEnd(15)).join('  ')).map(escHtml);
+  },
+
+  nl(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    if (!file) return [cl('nl: missing file', 'out-error')];
+    const p = resolvePath(file);
+    if (!FS[p]) return [cl(`nl: ${file}: No such file`, 'out-error')];
+    return (FS[p].content || '').split('\n').map((l, i) => `<span class="out-dim">${String(i+1).padStart(6)}\t</span>${escHtml(l)}`);
+  },
+
+  rev(args) {
+    if (args.length) {
+      const p = resolvePath(args[0]);
+      if (FS[p]) return (FS[p].content || '').split('\n').map(l => escHtml(l.split('').reverse().join('')));
+    }
+    return [cl('rev: reading from stdin not supported — provide a file', 'out-warn')];
+  },
+
+  od(args) {
+    const file = args.find(a => !a.startsWith('-'));
+    if (!file) return [cl('od: missing file', 'out-error')];
+    const p = resolvePath(file);
+    if (!FS[p]) return [cl(`od: ${file}: No such file`, 'out-error')];
+    const content = (FS[p].content || '').slice(0, 48);
+    const out = [];
+    for (let i = 0; i < content.length; i += 8) {
+      const chunk = content.slice(i, i+8);
+      const oct = chunk.split('').map(c => c.charCodeAt(0).toString(8).padStart(3,'0')).join(' ');
+      out.push(`<span class="out-dim">${i.toString(8).padStart(7,'0')}</span>  ${oct}`);
+    }
+    return out;
+  },
+
+  free(args) {
+    const human = args.includes('-h');
+    return [
+      `<span class="out-dim">               total        used        free      shared  buff/cache   available</span>`,
+      `Mem:        ${human?'7.7Gi       1.8Gi       5.1Gi       142Mi       786Mi       5.6Gi':'8044252     1886472     5214404      145316      943376     5756664'}`,
+      `Swap:       ${human?'2.0Gi          0B       2.0Gi':'2097148           0     2097148'}`,
+    ];
+  },
+
+  vmstat(args) {
+    return [
+      `<span class="out-dim">procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----</span>`,
+      `<span class="out-dim"> r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st</span>`,
+      ` 1  0      0 5214404  12288 943376    0    0    18    12  245  512  2  1 96  1  0`,
+    ];
+  },
+
+  ss(args) {
+    return [
+      `<span class="out-dim">Netid  State   Recv-Q Send-Q Local Address:Port   Peer Address:Port</span>`,
+      `tcp    LISTEN  0      128    0.0.0.0:22          0.0.0.0:*`,
+      `tcp    LISTEN  0      511    0.0.0.0:80          0.0.0.0:*`,
+      `tcp    ESTAB   0      0      192.168.1.100:22    192.168.1.1:54321`,
+    ];
+  },
+
+  dig(args) {
+    const host = args.find(a => !a.startsWith('-') && !a.startsWith('@')) || 'example.com';
+    return [
+      cl(`; <<>> DiG 9.18.24 <<>> ${host}`, 'out-dim'),
+      cl(';; QUESTION SECTION:', 'out-dim'),
+      cl(`;${host}.  IN  A`, 'out-normal'),
+      cl(';; ANSWER SECTION:', 'out-dim'),
+      cl(`${host}.  300  IN  A  93.184.216.34`, 'out-success'),
+      cl(`;; Query time: 23 msec\n;; SERVER: 8.8.8.8#53(8.8.8.8)\n;; WHEN: ${new Date().toUTCString()}`, 'out-dim'),
+    ];
+  },
+
+  nslookup(args) {
+    const host = args[0] || 'example.com';
+    return [cl(`Server: 8.8.8.8\nAddress: 8.8.8.8#53\n\nNon-authoritative answer:\nName: ${host}\nAddress: 93.184.216.34`, 'out-normal')];
+  },
+
+  whois(args) {
+    const host = args[0] || 'example.com';
+    return [
+      cl(`Domain Name: ${host.toUpperCase()}`, 'out-normal'),
+      cl(`Registrar: Example Registrar, Inc.`, 'out-normal'),
+      cl(`Creation Date: 1995-08-14`, 'out-normal'),
+      cl(`Expiration Date: 2025-08-13`, 'out-normal'),
+      cl(`Name Servers: NS1.EXAMPLE.COM, NS2.EXAMPLE.COM`, 'out-normal'),
+      cl(`(Simulated whois output)`, 'out-dim'),
+    ];
+  },
+
+  traceroute(args) {
+    const host = args.find(a => !a.startsWith('-')) || 'google.com';
+    const hops = [
+      ['1', '192.168.1.1', '0.543 ms'],
+      ['2', '10.0.0.1', '5.231 ms'],
+      ['3', '72.14.194.1', '12.443 ms'],
+      ['4', '142.251.49.3', '18.672 ms'],
+      ['5', `${host}`, '22.101 ms'],
+    ];
+    return [
+      cl(`traceroute to ${host}, 30 hops max, 60 byte packets`, 'out-dim'),
+      ...hops.map(([n, ip, ms]) => ` ${n.padStart(2)}  ${ip.padEnd(20)} ${ms}`),
+    ];
+  },
+
+  arp(args) {
+    return [
+      `<span class="out-dim">Address                  HWtype  HWaddress           Flags Mask  Iface</span>`,
+      `192.168.1.1              ether   aa:bb:cc:dd:ee:ff   C           eth0`,
+      `192.168.1.102            ether   11:22:33:44:55:66   C           eth0`,
+    ];
+  },
+
+  'ip6tables'() { return [cl('ip6tables: (simulated — requires root in real Linux)', 'out-dim')]; },
+  iptables(args) {
+    if (!state.isRoot) return [cl('iptables: Permission denied. Use sudo.', 'out-error')];
+    return [
+      `<span class="out-dim">Chain INPUT (policy ACCEPT)</span>`,
+      `target  prot opt source     destination`,
+      `ACCEPT  all  --  anywhere   anywhere    state RELATED,ESTABLISHED`,
+      `<span class="out-dim">Chain OUTPUT (policy ACCEPT)</span>`,
+      `target  prot opt source     destination`,
+    ];
+  },
+
+  cowsay(args) {
+    const msg = args.join(' ') || 'Moo!';
+    const line = '_'.repeat(msg.length + 2);
+    return [
+      ` ${'_'.repeat(msg.length + 2)}`,
+      `< ${escHtml(msg)} >`,
+      ` ${'-'.repeat(msg.length + 2)}`,
+      `        \\   ^__^`,
+      `         \\  (oo)\\_______`,
+      `            (__)\\       )\\/\\`,
+      `                ||----w |`,
+      `                ||     ||`,
+    ];
+  },
+
+  fortune() {
+    const fortunes = [
+      '"The quieter you become, the more you can hear." — Ram Dass',
+      '"Hack the planet!" — Hackers (1995)',
+      '"With great power comes great responsibility." — Uncle Ben',
+      '"In God we trust. All others we monitor." — NSA',
+      '"Security is a process, not a product." — Bruce Schneier',
+      '"The only truly secure system is one that is powered off." — Gene Spafford',
+      '"Never underestimate the determination of a kid who is time-rich and cash-poor." — Cory Doctorow',
+      '"There are only two hard things in Computer Science: cache invalidation and naming things." — Phil Karlton',
+    ];
+    return [cl(fortunes[Math.floor(Math.random() * fortunes.length)], 'out-accent')];
+  },
+
+  figlet(args) {
+    const text = args.join(' ') || 'CYBER';
+    // Simple block letters for short words
+    const block = {
+      'C':['  ██████ ','██      ','██      ','██      ','  ██████ '],
+      'Y':['██    ██','  ████  ','   ██   ','   ██   ','   ██   '],
+      'B':['███████ ','██    ██','███████ ','██    ██','███████ '],
+      'E':['███████','██     ','█████  ','██     ','███████'],
+      'R':['███████ ','██   ██ ','███████ ','██  ██  ','██   ██ '],
+      'A':['  ████  ','██    ██','████████','██    ██','██    ██'],
+      'S':['███████','██     ','███████','     ██','███████'],
+      'I':['███','███',' ██',' ██','███'],
+      'N':['██    ██','███   ██','████  ██','██ ████','██    ██'],
+      ' ':['   ','   ','   ','   ','   '],
+    };
+    const chars = text.toUpperCase().split('').slice(0, 8);
+    const rows = Array.from({length: 5}, (_, row) =>
+      chars.map(c => (block[c] || block[' '])[row] || '     ').join(' ')
+    );
+    return rows.map(r => `<span class="out-accent" style="letter-spacing:0">${escHtml(r)}</span>`);
+  },
+
+  reset() { terminal.innerHTML = ''; printWelcome(); return []; },
+
+  script(args) {
+    const file = args.find(a => !a.startsWith('-')) || 'typescript';
+    const path = resolvePath(file);
+    FS[path] = { type:'file', perm:'-rw-r--r--', owner:state.user, group:state.user, mtime:now(), content:`Script started at ${new Date()}\n` };
+    return [cl(`Script started, file is ${file}\n(Simulated — Ctrl+D to exit)`, 'out-success')];
+  },
+
+  timeout(args) {
+    const duration = args[0];
+    const cmd = args.slice(1);
+    return [cl(`(Simulated timeout ${duration}): `, 'out-dim'), ...processCommand(cmd.join(' '))];
+  },
+
+  true() { return []; },
+  false() { return []; },
+  ':' ()  { return []; }, // no-op
+
+  test(args) {
+    const expr = args.join(' ');
+    return [cl(`[ ${expr} ]: (expression evaluated, exit status 0)`, 'out-dim')];
+  },
+
+  expr(args) {
+    try {
+      const expr = args.join(' ').replace(/\//g, '/');
+      const result = Function(`"use strict"; return (${expr})`)();
+      return [cl(String(result), 'out-normal')];
+    } catch { return [cl('expr: syntax error', 'out-error')]; }
+  },
+
+  let(args) {
+    try {
+      const result = Function(`"use strict"; return (${args.join('')})`)();
+      return [cl(String(result), 'out-normal')];
+    } catch { return [cl('let: syntax error', 'out-error')]; }
+  },
+
+  lsof(args) {
+    return [
+      `<span class="out-dim">COMMAND  PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME</span>`,
+      `bash    1337 ${state.user}  cwd    DIR    8,1     4096  256 ${state.cwd}`,
+      `bash    1337 ${state.user}    0u   CHR  136,0      0t0    3 /dev/pts/0`,
+    ];
+  },
+
+  strace(args) { return [cl('strace: (simulated — system call tracer)', 'out-dim'), cl('execve("/bin/bash", ["bash"], envp) = 0', 'out-dim')]; },
+  ltrace(args) { return [cl('ltrace: (simulated — library call tracer)', 'out-dim')]; },
+  strings(args) { const f = args.find(a => !a.startsWith('-')); if (!f) return [cl('strings: missing file', 'out-error')]; const path = resolvePath(f); if (!FS[path]) return [cl(`strings: ${f}: No such file`, 'out-error')]; return (FS[path].content || '').split('\n').filter(l => l.length > 3).map(escHtml); },
+  file(args) { const f = args.find(a => !a.startsWith('-')); if (!f) return [cl('file: missing file', 'out-error')]; const path = resolvePath(f); if (!FS[path]) return [cl(`file: ${f}: No such file`, 'out-error')]; return [cl(`${f}: ${FS[path].type === 'dir' ? 'directory' : 'ASCII text'}`, 'out-normal')]; },
+  xxd(args) { const f = args.find(a => !a.startsWith('-')); if (!f) return [cl('xxd: missing file', 'out-error')]; const p = resolvePath(f); if (!FS[p]) return [cl(`xxd: ${f}: No such file`, 'out-error')]; const content = (FS[p].content || '').slice(0, 64); let out = []; for (let i = 0; i < content.length; i += 16) { const chunk = content.slice(i, i + 16); const hex = chunk.split('').map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join(' '); const ascii = chunk.replace(/[^\x20-\x7e]/g, '.'); out.push(`<span class="out-dim">${i.toString(16).padStart(8,'0')}:</span> ${hex.padEnd(48)}  ${escHtml(ascii)}`); } return out; },
+
+  base64(args) {
+    const decode = args.includes('-d');
+    const file = args.find(a => !a.startsWith('-'));
+    if (file) {
+      const p = resolvePath(file);
+      if (!FS[p]) return [cl(`base64: ${file}: No such file`, 'out-error')];
+      try { return [decode ? atob(FS[p].content || '') : btoa(FS[p].content || '')].map(escHtml); } catch { return [cl('base64: invalid input', 'out-error')]; }
+    }
+    return [cl('base64: reading from stdin not supported — provide a file', 'out-warn')];
+  },
+
+  md5sum(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    return files.map(f => { const p = resolvePath(f); if (!FS[p]) return cl(`md5sum: ${f}: No such file`, 'out-error'); const fake = Array.from({length:32}, () => '0123456789abcdef'[Math.random()*16|0]).join(''); return `${fake}  ${f}`; });
+  },
+
+  sha256sum(args) {
+    const files = args.filter(a => !a.startsWith('-'));
+    return files.map(f => { const p = resolvePath(f); if (!FS[p]) return cl(`sha256sum: ${f}: No such file`, 'out-error'); const fake = Array.from({length:64}, () => '0123456789abcdef'[Math.random()*16|0]).join(''); return `${fake}  ${f}`; });
+  },
+
+  python3(args) {
+    if (!args.length) return [cl('Python 3.11.6 (main, Oct  8 2023, 05:06:43)\n[GCC 13.2.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(Interactive Python not available in simulator)', 'out-dim')];
+    return [cl(`python3: ${args[0]}: file execution not available in simulator`, 'out-warn')];
+  },
+
+  python(args) { return COMMANDS.python3(args); },
+
+  bash(args) {
+    if (!args.length) return [cl('bash: spawning new shell (simulated)', 'out-dim')];
+    const p = resolvePath(args[0]);
+    if (!FS[p]) return [cl(`bash: ${args[0]}: No such file or directory`, 'out-error')];
+    return [cl(`Executing ${args[0]}...\n(Script execution simulated)`, 'out-dim')];
+  },
+
+  sh(args) { return COMMANDS.bash(args); },
+
+  apt(args) {
+    const sub = args[0];
+    if (sub === 'update') return [cl('Hit:1 http://kali.download/kali kali-rolling InRelease\nReading package lists... Done', 'out-success')];
+    if (sub === 'install') {
+      const pkgs = args.slice(1).filter(a => !a.startsWith('-'));
+      return [cl(`Reading package lists... Done\nBuilding dependency tree... Done\nThe following packages will be installed:\n  ${pkgs.join('  ')}\nDo you want to continue? [Y/n] (Simulated: Y)\nSetting up ${pkgs.join(' ')}... done`, 'out-success')];
+    }
+    if (sub === 'remove') return [cl(`Removing packages (simulated)...`, 'out-success')];
+    return [cl('apt: usage: apt [install|remove|update|upgrade|search] ...', 'out-error')];
+  },
+
+  'apt-get'(args) { return COMMANDS.apt(args); },
+
+  pip(args) {
+    const sub = args[0];
+    if (sub === 'install') return [cl(`Collecting ${args.slice(1).join(' ')}\nInstalling collected packages (simulated)`, 'out-success')];
+    return [cl('pip: usage: pip [install|uninstall|list] ...', 'out-error')];
+  },
+
+  pip3(args) { return COMMANDS.pip(args); },
+
+  git(args) {
+    const sub = args[0];
+    if (sub === 'init') return [cl('Initialized empty Git repository in ' + state.cwd + '/.git/', 'out-success')];
+    if (sub === 'status') return [cl('On branch main\nNothing to commit, working tree clean', 'out-normal')];
+    if (sub === 'log') return [cl('commit a1b2c3d4e5f67890abcdef1234567890abcdef12\nAuthor: Student <student@kali>\nDate:   ' + new Date().toDateString() + '\n\n    Initial commit', 'out-normal')];
+    if (sub === 'clone') return [cl(`Cloning into '${(args[1]||'repo').split('/').pop()}'...\n(Simulated — no network access)`, 'out-dim')];
+    return [cl(`git: '${sub}' is a git command. (Simulated git)`, 'out-dim')];
+  },
+
+  systemctl(args) {
+    if (!state.isRoot) return [cl('Failed to connect to bus: Permission denied. Use sudo.', 'out-error')];
+    const [action, service] = args;
+    if (action === 'status') return [cl(`● ${service || 'system'}\n   Loaded: loaded\n   Active: active (running)`, 'out-success')];
+    return [cl(`systemctl: ${action} ${service || ''} (simulated)`, 'out-dim')];
+  },
+
+  service(args) { return COMMANDS.systemctl([args[1], args[0]]); },
+
+  journalctl(args) {
+    return [
+      cl('-- Logs begin at Mon 2025-06-16 10:00:01 UTC --', 'out-dim'),
+      cl('Jun 16 10:00:02 kali systemd[1]: Started Network Service.', 'out-normal'),
+      cl('Jun 16 10:00:05 kali sshd[350]: Server listening on port 22.', 'out-normal'),
+      cl('Jun 16 10:42:17 kali bash[1337]: New shell session started', 'out-normal'),
+    ];
+  },
+
+  'read'(args) { return [cl('read: built-in shell command (not interactive in simulator)', 'out-dim')]; },
+  source(args) { return [cl(`source: ${args[0] || ''}: sourced (simulated)`, 'out-dim')]; },
+  '.':    function(args) { return COMMANDS.source(args); },
+  type(args)  { return args.map(a => COMMANDS[a] ? cl(`${a} is a shell builtin`, 'out-normal') : cl(`${a}: not found`, 'out-error')); },
+  command(args) { return COMMANDS.type(args.filter(a => !a.startsWith('-'))); },
+  declare(args) { return [cl('declare: (simulated)', 'out-dim')]; },
+};
+
+// ── sudo / su handling ──────────────────────────────────────────────
+function runSudoSu() {
+  appendLine(cl('[sudo] password for student: ', 'out-warn'));
+  state.awaitingPassword = 'sudo-su';
+  state.passwordCallback = (pwd) => {
+    if (pwd === state.sudoPassword) {
+      state.isRoot = true;
+      state.user = 'root';
+      state.env.USER = 'root';
+      state.env.HOME = '/root';
+      updatePromptDisplay();
+      updateStatusBar();
+      appendLine(cl('root@kali:/home/student# ', 'out-dim'));
+    } else {
+      appendLine(cl('sudo: Authentication failure. 3 incorrect password attempts.', 'out-error'));
+    }
+    state.awaitingPassword = false;
+  };
+  setInputType('password');
+  return [];
+}
+
+function runWithSudo(args) {
+  appendLine(cl('[sudo] password for student: ', 'out-warn'));
+  state.awaitingPassword = 'sudo-cmd';
+  state.sudoPendingCmd = args;
+  state.passwordCallback = (pwd) => {
+    if (pwd === state.sudoPassword) {
+      const wasRoot = state.isRoot;
+      state.isRoot = true; state.user = 'root';
+      const result = processCommand(state.sudoPendingCmd.join(' '), true);
+      if (!wasRoot) { state.isRoot = false; state.user = 'student'; }
+      appendOutput(result);
+    } else {
+      appendLine(cl('sudo: 3 incorrect password attempts', 'out-error'));
+    }
+    state.awaitingPassword = false;
+  };
+  setInputType('password');
+  return [];
+}
+
+function setInputType(type) {
+  const inp = document.getElementById('inputField');
+  inp.type = type;
+}
+
+// ── Nano Editor ───────────────────────────────────────────────────────
+function openNano(path, displayName) {
+  const existing = FS[path] ? (FS[path].content || '') : '';
+  const editor = document.getElementById('nanoEditor');
+  const content = document.getElementById('nanoContent');
+  const title = document.getElementById('nanoTitle');
+  const termDiv = document.getElementById('terminal');
+  const inputRow = document.getElementById('inputRow');
+
+  title.textContent = `GNU nano 7.2  File: ${displayName}`;
+  content.value = existing;
+  editor.classList.add('active');
+  termDiv.style.display = 'none';
+  inputRow.style.display = 'none';
+  state.nanoFile = { path, displayName };
+  content.focus();
+
+  // Ctrl+O = save, Ctrl+X = close
+  content.onkeydown = (e) => {
+    if (e.ctrlKey && e.key === 'o') {
+      e.preventDefault();
+      FS[path] = { type: 'file', perm: '-rw-r--r--', owner: state.user, group: state.user, mtime: now(), content: content.value };
+      renderFileTree();
+      title.textContent = `GNU nano 7.2  File: ${displayName}  [SAVED]`;
+      setTimeout(() => { title.textContent = `GNU nano 7.2  File: ${displayName}`; }, 1500);
+    }
+    if (e.ctrlKey && e.key === 'x') {
+      e.preventDefault();
+      // Save automatically
+      FS[path] = { type: 'file', perm: '-rw-r--r--', owner: state.user, group: state.user, mtime: now(), content: content.value };
+      renderFileTree();
+      editor.classList.remove('active');
+      termDiv.style.display = '';
+      inputRow.style.display = '';
+      state.nanoFile = null;
+      appendLine(cl(`Saved '${displayName}'`, 'out-success'));
+      focusInput();
+    }
+  };
+}
+
+// ── Command Processor ─────────────────────────────────────────────────
+function processCommand(raw, silent = false) {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+
+  // Check aliases
+  const parts = trimmed.split(/\s+/);
+  let expanded = trimmed;
+  if (state.aliases[parts[0]]) expanded = state.aliases[parts[0]] + ' ' + parts.slice(1).join(' ');
+
+  // Handle !n history shortcut
+  if (/^!\d+$/.test(expanded)) {
+    const idx = parseInt(expanded.slice(1)) - 1;
+    if (idx >= 0 && idx < state.history.length) return processCommand(state.history[idx], silent);
+    return [cl(`bash: ${expanded}: event not found`, 'out-error')];
+  }
+
+  // Handle $? and $$ variables
+  expanded = expanded.replace(/\$\?/g, '0').replace(/\$\$/g, '1337');
+
+  // Handle pipe (cmd1 | cmd2 | cmd3)
+  if (expanded.includes('|')) {
+    const pipeParts = expanded.split('|').map(s => s.trim());
+    let pipeResult = [];
+    for (const part of pipeParts) {
+      const [pcmd, ...pargs] = part.split(/\s+/);
+      if (COMMANDS[pcmd]) {
+        // Pass previous result as stdin input for commands that support it
+        pipeResult = COMMANDS[pcmd](pargs, pipeResult) || [];
+      } else {
+        return [cl(`bash: ${pcmd}: command not found`, 'out-error')];
+      }
+    }
+    return pipeResult;
+  }
+
+  const [cmd, ...args] = expanded.split(/\s+/);
+
+  if (COMMANDS[cmd]) {
+    const result = COMMANDS[cmd](args) || [];
+    // Add education tip occasionally
+    if (TIPS[cmd] && Math.random() < 0.4) result.push(`<div class="edu-tip">💡 <strong>${cmd}:</strong> ${TIPS[cmd]}</div>`);
+    return result;
+  }
+
+  // Not found
+  if (trimmed.includes('=') && !trimmed.startsWith('echo')) {
+    const [k, ...v] = trimmed.split('=');
+    state.env[k.trim()] = v.join('=').trim().replace(/^['"]|['"]$/g,'');
+    return [];
+  }
+
+  return [cl(`bash: ${cmd}: command not found`, 'out-error'), cl(`Try 'help' for available commands or 'man ${cmd}' for manual.`, 'out-dim')];
+}
+
+// ── Input Handler ─────────────────────────────────────────────────────
+function handleInput(raw) {
+  const inp = document.getElementById('inputField');
+
+  // Password mode
+  if (state.awaitingPassword) {
+    inp.type = 'text';
+    if (state.passwordCallback) state.passwordCallback(raw);
+    return;
+  }
+
+  showCommandLine(raw);
+
+  if (!raw.trim()) return;
+
+  state.history.push(raw);
+  state.histIdx = state.history.length;
+  state.cmdCount++;
+  document.getElementById('cmdCount').textContent = state.cmdCount;
+
+  const output = processCommand(raw);
+  appendOutput(output);
+
+  updatePromptDisplay();
+  updateStatusBar();
+  hideAutocomplete();
+}
+
+// ── Autocomplete ──────────────────────────────────────────────────────
+const ALL_COMMANDS = Object.keys(COMMANDS);
+
+function getCompletions(partial) {
+  if (!partial) return [];
+  const parts = partial.split(/\s+/);
+  if (parts.length === 1) {
+    // Command completion
+    return ALL_COMMANDS.filter(c => c.startsWith(partial)).map(c => ({ label: c, type: 'cmd' }));
+  }
+  // File/dir completion
+  const last = parts[parts.length - 1];
+  const base = last.includes('/') ? last.substring(0, last.lastIndexOf('/') + 1) : '';
+  const prefix = last.includes('/') ? last.substring(last.lastIndexOf('/') + 1) : last;
+  const dir = base ? resolvePath(base) : state.cwd;
+  return listDir(dir)
+    .filter(i => i.name.startsWith(prefix))
+    .map(i => ({ label: parts.slice(0, -1).join(' ') + ' ' + base + i.name + (i.type === 'dir' ? '/' : ''), type: i.type }));
+}
+
+let acSelected = -1;
+
+function showAutocomplete(val) {
+  const ac = document.getElementById('autocomplete');
+  const completions = getCompletions(val);
+  if (!completions.length) { hideAutocomplete(); return; }
+  ac.innerHTML = completions.slice(0, 10).map((c, i) =>
+    `<div class="ac-item" data-label="${escHtml(c.label)}" onclick="selectCompletion('${escHtml(c.label)}')">
+      <span class="ac-type">${c.type}</span>${escHtml(c.label)}
+    </div>`
+  ).join('');
+  ac.classList.add('visible');
+  acSelected = -1;
+}
+
+function hideAutocomplete() {
+  document.getElementById('autocomplete').classList.remove('visible');
+  acSelected = -1;
+}
+
+function selectCompletion(label) {
+  document.getElementById('inputField').value = label;
+  hideAutocomplete();
+  focusInput();
+}
+
+function navigateAC(dir) {
+  const items = document.querySelectorAll('.ac-item');
+  if (!items.length) return false;
+  items.forEach(i => i.classList.remove('selected'));
+  acSelected = Math.max(0, Math.min(items.length - 1, acSelected + dir));
+  items[acSelected].classList.add('selected');
+  document.getElementById('inputField').value = items[acSelected].dataset.label;
+  return true;
+}
+
+// ── File Tree ─────────────────────────────────────────────────────────
+function renderFileTree() {
+  const tree = document.getElementById('fileTree');
+  const home = '/home/student';
+  const renderDir = (path, depth) => {
+    const children = listDir(path);
+    return children.map(c => {
+      const indent = '&nbsp;'.repeat(depth * 3);
+      const icon = c.type === 'dir' ? '📁' : c.name.endsWith('.txt') ? '📄' : c.name.endsWith('.sh') ? '⚙️' : '📃';
+      const cls = c.type === 'dir' ? 'dir' : c.name.match(/\.(sh|py|js)$/) ? 'exec' : '';
+      const active = state.cwd === c.path ? ' style="background:var(--bg3)"' : '';
+      return `<div class="tree-item ${cls}"${active} onclick="clickTreeItem('${c.path}','${c.type}')">
+        ${indent}<span class="icon">${icon}</span>${escHtml(c.name)}${c.type==='dir'?'/':''}
+      </div>` + (c.type === 'dir' && state.cwd.startsWith(c.path) ? renderDir(c.path, depth + 1) : '');
+    }).join('');
+  };
+  tree.innerHTML = renderDir('/', 0);
+}
+
+function clickTreeItem(path, type) {
+  if (type === 'dir') {
+    COMMANDS.cd([path]);
+  } else {
+    processCommand(`cat ${path}`);
+    appendOutput(COMMANDS.cat([path]));
+  }
+}
+
+// ── Themes ────────────────────────────────────────────────────────────
+const THEMES = {
+  'github-dark': { bg:'#0d1117', bg2:'#161b22', bg3:'#21262d', border:'#30363d', prompt:'#7ee787', cmd:'#e6edf3', output:'#b3c3d4', error:'#f85149', warn:'#e3b341', info:'#58a6ff', accent:'#bc8cff', dim:'#484f58' },
+  'midnight':    { bg:'#1a1a2e', bg2:'#16213e', bg3:'#0f3460', border:'#533483', prompt:'#e94560', cmd:'#e0e0e0', output:'#b0bec5', error:'#ff6b6b', warn:'#ffd93d', info:'#6bcff5', accent:'#a855f7', dim:'#546e7a' },
+  'matrix':      { bg:'#0f0f0f', bg2:'#0a1a0a', bg3:'#0d200d', border:'#1a3d1a', prompt:'#00ff41', cmd:'#00cc33', output:'#008f11', error:'#ff0000', warn:'#ffff00', info:'#00ccff', accent:'#00ff41', dim:'#005c0e' },
+  'vscode':      { bg:'#1e1e1e', bg2:'#252526', bg3:'#2d2d30', border:'#3e3e42', prompt:'#4ec9b0', cmd:'#d4d4d4', output:'#9cdcfe', error:'#f44747', warn:'#ce9178', info:'#569cd6', accent:'#c586c0', dim:'#6a9955' },
+  'kali':        { bg:'#1a0000', bg2:'#2b0000', bg3:'#3d0000', border:'#660000', prompt:'#ff4444', cmd:'#f0f0f0', output:'#cc8888', error:'#ff0000', warn:'#ff8800', info:'#4488ff', accent:'#ff4444', dim:'#663333' },
+  'hacker':      { bg:'#001100', bg2:'#001b00', bg3:'#002200', border:'#003300', prompt:'#00ff00', cmd:'#ccffcc', output:'#88cc88', error:'#ff3333', warn:'#ffff00', info:'#00ccff', accent:'#00ff88', dim:'#004400' },
+  'dracula':     { bg:'#282a36', bg2:'#1e1f29', bg3:'#44475a', border:'#6272a4', prompt:'#50fa7b', cmd:'#f8f8f2', output:'#bd93f9', error:'#ff5555', warn:'#f1fa8c', info:'#8be9fd', accent:'#ff79c6', dim:'#6272a4' },
+  'light':       { bg:'#f5f5f0', bg2:'#e8e8e3', bg3:'#dcdcd7', border:'#c0c0bb', prompt:'#1a7f3c', cmd:'#1a1a1a', output:'#444444', error:'#c0392b', warn:'#d68910', info:'#2980b9', accent:'#6c3483', dim:'#888888' },
+};
+
+function applyTheme(name) {
+  const t = THEMES[name];
+  if (!t) return;
+  Object.entries(t).forEach(([k, v]) => document.documentElement.style.setProperty('--' + k, v));
+  document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === name));
+  document.getElementById('colorBg').value = t.bg;
+  document.getElementById('colorPrompt').value = t.prompt;
+  document.getElementById('colorCmd').value = t.cmd;
+  document.getElementById('colorAccent').value = t.accent;
+}
+
+function setCustomColor(prop, val) {
+  document.documentElement.style.setProperty('--' + prop, val);
+}
+
+function changeFontSize(delta) {
+  state.fontSize = Math.max(10, Math.min(22, state.fontSize + delta));
+  document.getElementById('terminal').style.fontSize = state.fontSize + 'px';
+  document.getElementById('inputField').style.fontSize = state.fontSize + 'px';
+  document.getElementById('inputPromptDisplay').style.fontSize = state.fontSize + 'px';
+  document.getElementById('fontSizeLabel').textContent = state.fontSize + 'px';
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────
+let tabCount = 1;
+function newTab() {
+  const id = tabCount++;
+  state.tabs.push({ id, title: 'student@kali:~' });
+  const tabBar = document.getElementById('tabBar');
+  const btn = document.getElementById('tabBar').querySelector('.new-tab-btn');
+  const tab = document.createElement('div');
+  tab.className = 'tab';
+  tab.dataset.tab = id;
+  tab.innerHTML = `<span>student@kali:~</span><span class="tab-close" onclick="closeTab(event,${id})">×</span>`;
+  tab.onclick = () => switchTab(id);
+  tabBar.insertBefore(tab, btn);
+  switchTab(id);
+  terminal.innerHTML = '';
+  printWelcome();
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', parseInt(t.dataset.tab) === id));
+  state.tabIdx = id;
+}
+
+function closeTab(e, id) {
+  e.stopPropagation();
+  const tabs = document.querySelectorAll('.tab');
+  if (tabs.length <= 1) return;
+  const tab = document.querySelector(`.tab[data-tab="${id}"]`);
+  if (tab) tab.remove();
+  switchTab(0);
+}
+
+// ── Cheatsheet ────────────────────────────────────────────────────────
+const CHEATSHEET = [
+  { cat: 'Navigation', cmds: [['pwd','Print current directory'],['ls','List directory'],['ls -la','Long list with hidden'],['cd <dir>','Change directory'],['cd ..','Go up one level'],['cd ~','Go home'],['tree','Show directory tree']] },
+  { cat: 'File Operations', cmds: [['touch file','Create empty file'],['mkdir dir','Create directory'],['mkdir -p a/b','Create nested dirs'],['rm file','Remove file'],['rm -r dir','Remove directory'],['cp src dst','Copy file'],['cp -r src dst','Copy directory'],['mv src dst','Move/rename'],['ln -s src link','Create symlink']] },
+  { cat: 'View Files', cmds: [['cat file','Show file contents'],['cat -n file','With line numbers'],['less file','Page through file'],['head file','First 10 lines'],['tail file','Last 10 lines'],['tail -f file','Follow log file'],['wc -l file','Count lines'],['wc -w file','Count words']] },
+  { cat: 'Edit Files', cmds: [['nano file','Open nano editor'],['echo "text"','Print text'],['echo "t" > f','Write to file'],['echo "t" >> f','Append to file']] },
+  { cat: 'Permissions', cmds: [['chmod 755 file','Set permissions (numeric)'],['chmod +x file','Make executable'],['chmod u+r file','Add user read'],['chown user file','Change owner'],['chgrp group file','Change group'],['umask','Show default permissions']] },
+  { cat: 'Search', cmds: [['grep "pat" file','Search in file'],['grep -r "pat" .','Search recursively'],['grep -i "pat" f','Case insensitive'],['find . -name "*.txt"','Find by name'],['find . -type f','Find files only'],['locate file','Find file fast'],['which cmd','Locate command']] },
+  { cat: 'System Info', cmds: [['whoami','Current user'],['id','User ID and groups'],['uname -a','System info'],['hostname','Machine name'],['uptime','System uptime'],['date','Current date/time'],['cal','Calendar'],['df -h','Disk usage'],['du -h','Directory size'],['lsblk','Block devices']] },
+  { cat: 'Processes', cmds: [['ps','Current processes'],['ps aux','All processes'],['top','Live process monitor'],['kill <PID>','Kill process'],['kill -9 <PID>','Force kill']] },
+  { cat: 'Users & Auth', cmds: [['sudo cmd','Run as root'],['sudo su','Switch to root'],['su user','Switch user'],['passwd','Change password'],['whoami','Show current user'],['id','Show UID/GID'],['useradd user','Add new user']] },
+  { cat: 'Network', cmds: [['ping host','Test connectivity'],['ifconfig','Network interfaces'],['ip addr show','IP addresses'],['netstat','Network connections'],['nmap host','Port scan (simulated)'],['ssh user@host','Remote connection'],['curl url','Fetch URL'],['wget url','Download file']] },
+  { cat: 'Archive', cmds: [['tar -czf f.tgz dir/','Create archive'],['tar -xzf f.tgz','Extract archive'],['zip -r f.zip dir/','Create zip'],['unzip file.zip','Extract zip'],['gzip file','Compress file'],['gunzip file.gz','Decompress']] },
+  { cat: 'Text Processing', cmds: [['sort file','Sort lines'],['sort -r file','Reverse sort'],['uniq file','Remove duplicates'],['diff f1 f2','Compare files'],['cut -d: -f1 f','Cut by delimiter'],['wc file','Word/line count']] },
+  { cat: 'Environment', cmds: [['env','Show all variables'],['echo $HOME','Print variable'],['export KEY=val','Set variable'],['unset KEY','Delete variable'],['alias ll="ls -la"','Create alias'],['history','Command history'],['!!','Repeat last command']] },
+  { cat: 'Kali Security Tools', cmds: [['nmap host','Port scan'],['nmap -sV host','Service version scan'],['nmap -A host','Aggressive scan'],['sqlmap -u url','SQL injection test'],['nikto -h host','Web vulnerability scan'],['john hash.txt','Password cracking'],['hydra -l user -P list host','Brute force login'],['hashcat -m 0 hash.txt','Hash cracking (MD5)'],['metasploit / msfconsole','Exploit framework'],['aircrack-ng cap.pcap','WiFi security tool'],['wireshark','Packet analyzer (GUI)']] },
+  { cat: 'Network & Discovery', cmds: [['ping -c 4 host','Ping host 4 times'],['traceroute host','Trace network route'],['dig domain','DNS lookup detailed'],['nslookup domain','Quick DNS query'],['whois domain','Domain WHOIS info'],['arp -a','Show ARP table'],['ss -tulpn','Listening sockets'],['netstat -an','All connections'],['ip route','Show routing table'],['iptables -L','Firewall rules (root)']] },
+  { cat: 'Forensics & Analysis', cmds: [['xxd file','Hex dump of file'],['od file','Octal dump'],['strings file','Extract readable strings'],['file file','Identify file type'],['md5sum file','MD5 hash checksum'],['sha256sum file','SHA256 hash checksum'],['base64 file','Base64 encode file'],['base64 -d file','Base64 decode file'],['strace cmd','Trace system calls'],['lsof','List open files']] },
+  { cat: 'Developer Tools', cmds: [['git init','Initialize git repo'],['git status','Check repo status'],['git log','View commit history'],['git clone <url>','Clone remote repo'],['python3 -m http.server','Quick HTTP server'],['pip install pkg','Install Python package'],['apt install pkg','Install system package'],['apt update','Update package list'],['bash script.sh','Run shell script'],['crontab -l','List cron jobs'],['systemctl status svc','Check service'],['journalctl -n 50','Last 50 log entries']] },
+  { cat: 'Fun & Extras', cmds: [['cowsay "hello"','Cow says hello'],['fortune','Random wisdom'],['figlet CYBER','ASCII art text'],['seq 1 10','Number sequence'],['shuf file','Shuffle file lines'],['factor 42','Prime factors of 42'],['rev file','Reverse each line'],['cal','Show calendar'],['reset','Reset terminal view'],['!!','Repeat last command'],['!5','Run history item #5']] },
+];
+
+function buildCheatsheet() {
+  const body = document.getElementById('cheatBody');
+  body.innerHTML = CHEATSHEET.map(section =>
+    `<div class="cs-category">${section.cat}</div>` +
+    section.cmds.map(([cmd, desc]) =>
+      `<div class="cs-cmd" onclick="insertCmd('${escHtml(cmd)}')">
+        <span class="cs-cmd-name">${escHtml(cmd)}</span>
+        <span class="cs-cmd-desc">${escHtml(desc)}</span>
+      </div>`
+    ).join('')
+  ).join('');
+}
+
+function insertCmd(cmd) {
+  document.getElementById('inputField').value = cmd;
+  focusInput();
+}
+
+// ── Status Bar ────────────────────────────────────────────────────────
+function updateStatusBar() {
+  document.getElementById('statusPath').textContent = displayPath(state.cwd);
+  document.getElementById('statusUser').textContent = state.user + '@' + state.hostname;
+  document.getElementById('statusDot').className = 'status-dot' + (state.isRoot ? ' root' : '');
+}
+
+// ── Welcome Message ───────────────────────────────────────────────────
+function printWelcome() {
+  const lines = [
+    `<span class="out-accent" style="font-weight:700;font-size:1.05em;letter-spacing:3px"> ██████╗██╗   ██╗██████╗ ███████╗██████╗ </span>`,
+    `<span class="out-accent" style="font-weight:700;letter-spacing:3px">██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗</span>`,
+    `<span class="out-info"  style="font-weight:700;letter-spacing:3px">██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝</span>`,
+    `<span class="out-info"  style="font-weight:700;letter-spacing:3px">██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗</span>`,
+    `<span class="out-success" style="font-weight:700;letter-spacing:3px">╚██████╗   ██║   ██████╔╝███████╗██║  ██║</span>`,
+    `<span class="out-success" style="font-weight:700;letter-spacing:3px"> ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝</span>`,
+    `<span class="out-dim">              A S S A S S I N S</span>`,
+    ``,
+    `<span class="out-dim">┌──────────────────────────────────────────────────────┐</span>`,
+    `<span class="out-dim">│</span>  <span class="out-success">Linux Terminal Simulator</span> <span class="out-dim">·</span> <span class="out-info">Kali GNU/Linux 2024.1</span>     <span class="out-dim">│</span>`,
+    `<span class="out-dim">│</span>  Kernel: <span class="out-accent">6.6.0-kali3-amd64</span> <span class="out-dim">·</span> User: <span class="out-success">${state.user}</span> <span class="out-dim">·</span> Pass: <span class="out-warn">toor</span>  <span class="out-dim">│</span>`,
+    `<span class="out-dim">└──────────────────────────────────────────────────────┘</span>`,
+    ``,
+    `<span class="out-info">  ┌─ Quick Start ──────────────────────────────────────┐</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Type</span>  <span class="out-success">help</span>         <span class="out-dim">→  show all 100+ commands</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Type</span>  <span class="out-success">man ls</span>       <span class="out-dim">→  read manual page</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Press</span> <span class="out-accent">Tab</span>          <span class="out-dim">→  autocomplete anything</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Press</span> <span class="out-accent">↑ ↓</span>         <span class="out-dim">→  browse command history</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Type</span>  <span class="out-warn">sudo su</span>      <span class="out-dim">→  become root (pw: toor)</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Click</span> <span class="out-accent">📋 Commands</span>  <span class="out-dim">→  full cheatsheet panel</span>`,
+    `<span class="out-info">  │</span>  <span class="out-dim">Click</span> <span class="out-accent">🎨 Theme</span>    <span class="out-dim">→  change colors + font</span>`,
+    `<span class="out-info">  └────────────────────────────────────────────────────┘</span>`,
+    ``,
+    `<span class="out-dim">  Made with ❤️  by </span><span class="out-accent">Shivam</span><span class="out-dim"> · MIT License · Practice safe. Learn fast.</span>`,
+    ``,
+  ];
+  lines.forEach(l => appendLine(l));
+}
+
+// ── Boot Sequence ─────────────────────────────────────────────────────
+function runBoot() {
+  const screen = document.getElementById('bootScreen');
+  const lines = [
+    '[    0.000000] Linux version 6.6.0-kali3-amd64 (Debian 6.6.9-1kali1)',
+    '[    0.000000] BIOS-provided physical RAM map:',
+    '[    0.003812] ACPI: RSDP 0x00000000000F05B0 000024 (v02 BOCHS)',
+    '[    0.234561] PCI: Using configuration type 1 for base access',
+    '[    0.456789] clocksource: tsc: mask: 0xffffffffffffffff',
+    '[    0.891234] NET: Registered PF_INET6 protocol family',
+    '[    1.234567] EXT4-fs (sda1): mounted filesystem',
+    '[    1.456789] systemd[1]: Starting Kali GNU/Linux...',
+    '[    1.678901] systemd[1]: Started Network Service.',
+    '[    2.123456] systemd[1]: Started SSH Daemon.',
+    '[    2.345678] systemd[1]: Reached target Multi-User System.',
+    '',
+    'Kali GNU/Linux 2024.1 kali tty1',
+    'kali login: student',
+    'Password: ••••',
+    'Linux kali 6.6.0-kali3-amd64 #1 SMP Debian 6.6.9-1kali1',
+    '',
+    '⚡ Welcome to Cyber Assassins Terminal',
+  ];
+
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i >= lines.length) {
+      clearInterval(interval);
+      setTimeout(() => {
+        screen.classList.add('done');
+        document.getElementById('app').style.display = '';
+        printWelcome();
+        focusInput();
+      }, 400);
+      return;
+    }
+    const div = document.createElement('div');
+    div.className = 'boot-line';
+    div.style.animation = `bootLine 0.05s ease forwards`;
+    div.style.color = lines[i].startsWith('[') ? '#7ee787' : lines[i].startsWith('⚡') ? '#bc8cff' : '#b3c3d4';
+    div.textContent = lines[i];
+    screen.appendChild(div);
+    i++;
+  }, 60);
+}
+
+// ── Focus helpers ─────────────────────────────────────────────────────
+function focusInput() {
+  document.getElementById('inputField').focus();
+}
+
+// ── Main Event Listeners ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('inputField');
+
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = inp.value;
+      inp.value = '';
+      hideAutocomplete();
+      handleInput(val);
+    }
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      const val = inp.value;
+      const completions = getCompletions(val);
+      if (completions.length === 1) { inp.value = completions[0].label; hideAutocomplete(); }
+      else if (completions.length > 1) showAutocomplete(val);
+    }
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const ac = document.getElementById('autocomplete');
+      if (ac.classList.contains('visible')) { navigateAC(-1); return; }
+      if (state.histIdx > 0) { state.histIdx--; inp.value = state.history[state.histIdx]; }
+    }
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const ac = document.getElementById('autocomplete');
+      if (ac.classList.contains('visible')) { navigateAC(1); return; }
+      if (state.histIdx < state.history.length - 1) { state.histIdx++; inp.value = state.history[state.histIdx]; }
+      else { state.histIdx = state.history.length; inp.value = ''; }
+    }
+    else if (e.key === 'l' && e.ctrlKey) {
+      e.preventDefault();
+      terminal.innerHTML = '';
+    }
+    else if (e.key === 'c' && e.ctrlKey) {
+      e.preventDefault();
+      state.awaitingPassword = false;
+      inp.type = 'text';
+      appendLine(promptHTML() + '&nbsp;<span class="cmd-text">^C</span>');
+    }
+    else if (e.key === 'Escape') { hideAutocomplete(); }
+  });
+
+  inp.addEventListener('input', () => {
+    const val = inp.value;
+    if (val.length > 0 && !state.awaitingPassword) showAutocomplete(val);
+    else hideAutocomplete();
+  });
+
+  // Theme panel
+  document.getElementById('themeToggle').onclick = () => {
+    document.getElementById('themePanel').classList.toggle('open');
+  };
+  document.getElementById('presetSwatches').addEventListener('click', (e) => {
+    const sw = e.target.closest('.swatch');
+    if (sw) applyTheme(sw.dataset.theme);
+  });
+
+  // Cheatsheet
+  document.getElementById('cheatToggle').onclick = () => {
+    document.getElementById('cheatsheet').classList.toggle('open');
+  };
+  document.getElementById('cheatClose').onclick = () => {
+    document.getElementById('cheatsheet').classList.remove('open');
+  };
+
+  // Sidebar
+  document.getElementById('sidebarToggle').onclick = () => {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  };
+
+  buildCheatsheet();
+  renderFileTree();
+  updatePromptDisplay();
+  updateStatusBar();
+  runBoot();
+});
+</script>
+</body>
+</html>

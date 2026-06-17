@@ -1,0 +1,19 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if contributors add tooling later)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+
+# Local env
+.env
